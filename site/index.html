@@ -71,6 +71,7 @@
     <button data-player="Andreas" class="on">Andreas</button>
     <button data-player="Cal" class="cal">Cal</button>
   </div>
+  <span class="chip" id="whoami" style="display:none"></span>
   <div class="reserves" id="reserves"></div>
   <button class="btn save" id="saveBtn">Save</button>
   <span class="status" id="status"></span>
@@ -101,6 +102,10 @@ const SIDE_PLAYER = [
 const GROUPS = "ABCDEFGHIJKL".split("");
 
 let DATA = null, META = {}, VALUES = {}, PLAYER = "Andreas", LOCKED = false;
+// Hosted mode: a magic-link token in the URL (?p=…) means the player is fixed by their link.
+// No token = local-server mode with the Andreas/Cal toggle. Same page serves both.
+const TOKEN = new URLSearchParams(location.search).get("p");
+function api(path){ return TOKEN ? path + (path.includes("?")?"&":"?") + "p=" + encodeURIComponent(TOKEN) : path; }
 
 const $ = s => document.querySelector(s);
 function teamOptions(sel){
@@ -259,7 +264,7 @@ async function save(){
   const btn=$("#saveBtn"), s=$("#status"); btn.disabled=true; s.style.color=""; s.textContent="Saving…";
   try{
     const picks=collectPicks();
-    const res=await fetch("/api/save",{method:"POST",headers:{"Content-Type":"application/json"},
+    const res=await fetch(api("/api/save"),{method:"POST",headers:{"Content-Type":"application/json"},
       body:JSON.stringify({player:PLAYER,picks})});
     const j=await res.json(); if(!res.ok) throw new Error(j.error||"save failed");
     s.style.color="var(--good)"; s.textContent=`Saved ✓ ${j.saved} picks`;
@@ -270,7 +275,7 @@ async function lockBracket(){
   if(!confirm("Lock "+PLAYER+"'s bracket? Picks become immutable and visible to your opponent.")) return;
   await save();
   try{
-    const res=await fetch("/api/lock",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({player:PLAYER})});
+    const res=await fetch(api("/api/lock"),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({player:PLAYER})});
     const j=await res.json(); if(!res.ok) throw new Error(j.error||"lock failed");
     LOCKED=true; setLockedUI();
   }catch(err){ showErr("Lock failed: "+err.message); }
@@ -283,12 +288,15 @@ function setLockedUI(){
 function showErr(m){ const b=$("#errBanner"); b.textContent="⚠ "+m; b.style.display="block"; setTimeout(()=>b.style.display="none",5000); }
 
 async function loadPlayer(player){
-  PLAYER=player; LOCKED=false; VALUES={};
+  PLAYER=player||PLAYER; LOCKED=false; VALUES={};
   $("#lockBanner").style.display="none";
-  $("#app").innerHTML='<div class="loading">Loading '+player+"'s picks…</div>";
+  $("#app").innerHTML='<div class="loading">Loading picks…</div>';
   try{
-    const res=await fetch("/api/bootstrap?player="+encodeURIComponent(player));
+    const url = TOKEN ? api("/api/bootstrap") : ("/api/bootstrap?player="+encodeURIComponent(player));
+    const res=await fetch(url);
     DATA=await res.json(); if(!res.ok) throw new Error(DATA.error||"load failed");
+    PLAYER = DATA.player || PLAYER;
+    if(TOKEN){ const w=$("#whoami"); w.textContent=PLAYER+"'s picks"; w.style.display=""; }
     LOCKED=!!DATA.locked;
     (DATA.existing||[]).forEach(p=>{ VALUES[p.key]={
       team_id:p.team_id!=null?String(p.team_id):undefined,
@@ -308,7 +316,11 @@ document.addEventListener("click", e=>{
     e.target.classList.add("on"); loadPlayer(e.target.dataset.player);
   }
 });
-loadPlayer("Andreas");
+const LOCAL = location.hostname==="127.0.0.1" || location.hostname==="localhost";
+if(TOKEN){ $("#playerSeg").style.display="none"; loadPlayer(); }
+else if(!LOCAL){ $("#playerSeg").style.display="none";
+  $("#app").innerHTML='<div class="loading">Open your personal pick-entry link (the one ending in ?p=…) to continue.</div>'; }
+else { loadPlayer("Andreas"); }   // local server: Andreas/Cal toggle
 </script>
 </body>
 </html>
