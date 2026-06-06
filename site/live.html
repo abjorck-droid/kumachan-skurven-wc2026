@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>World Cup 2026 — Andreas v Cal · Live</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Antonio:wght@300;400;500;600;700&family=Cormorant+Garamond:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0a0b10; --card:#14161d; --card-soft:#1a1d26; --border:rgba(255,255,255,0.08);
+    --border-strong:rgba(255,255,255,0.16); --text:#f0f0f3; --text-dim:#8a8c94; --text-mute:#5a5c64;
+    --accent:#ff1c5c; --accent-soft:rgba(255,28,92,0.12); --gold:#e8b948; --gold-soft:rgba(232,185,72,0.14);
+    --p1:#4ec9b0; --p1-soft:rgba(78,201,176,0.14); --p2:#c586c0; --p2-soft:rgba(197,134,192,0.16);
+    --good:#5ade8c; --bad:#ff5a5a;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:radial-gradient(1200px 600px at 50% -10%, rgba(255,28,92,0.06), transparent 60%), var(--bg);
+    color:var(--text);font-family:'Inter',-apple-system,sans-serif;-webkit-font-smoothing:antialiased;padding-bottom:70px}
+  .wrap{max-width:920px;margin:0 auto;padding:0 18px}
+
+  /* header */
+  .header{display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:14px;
+    max-width:920px;margin:0 auto;padding:26px 18px 18px;border-bottom:1px solid var(--border)}
+  .title{font-family:'Antonio',sans-serif;font-weight:600;font-size:28px;line-height:1;letter-spacing:.02em}
+  .title .yr{color:var(--accent);font-weight:700}
+  .subtitle{font-family:'Antonio',sans-serif;font-weight:300;font-size:12px;color:var(--text-dim);
+    letter-spacing:.14em;text-transform:uppercase;margin-top:6px}
+  .h2h{display:flex;gap:26px}
+  .h2h .col{text-align:right}
+  .h2h .name{font-family:'Antonio',sans-serif;font-size:11px;letter-spacing:.15em;color:var(--text-dim);text-transform:uppercase}
+  .h2h .score{font-family:'Cormorant Garamond',serif;font-size:36px;line-height:1;font-weight:600;margin-top:4px;
+    font-variant-numeric:tabular-nums}
+  .h2h .col.c1 .score{color:var(--p1)} .h2h .col.c2 .score{color:var(--p2)}
+  .h2h .meta{font-family:'Antonio',sans-serif;font-size:10.5px;letter-spacing:.1em;color:var(--gold);
+    text-transform:uppercase;margin-top:7px;font-weight:500}
+  .h2h .lockst{font-size:10px;letter-spacing:.12em;margin-top:4px;font-family:'Antonio',sans-serif;text-transform:uppercase}
+  .h2h .lockst.yes{color:var(--gold)} .h2h .lockst.no{color:var(--text-mute)}
+
+  /* sticky tab bar */
+  .topbar{position:sticky;top:0;z-index:20;background:rgba(10,11,16,0.92);backdrop-filter:blur(10px);
+    border-bottom:1px solid var(--border)}
+  .tabs{max-width:920px;margin:0 auto;padding:0 18px;display:flex;gap:2px;overflow-x:auto}
+  .tabs button{background:transparent;border:none;border-bottom:2px solid transparent;cursor:pointer;
+    font-family:'Antonio',sans-serif;font-size:13px;letter-spacing:.07em;text-transform:uppercase;
+    color:var(--text-dim);padding:12px 13px;font-weight:500;white-space:nowrap}
+  .tabs button:hover{color:var(--text)}
+  .tabs button.on{color:var(--text);border-bottom-color:var(--accent)}
+  .tabpanel{display:none} .tabpanel.active{display:block}
+
+  h2{font-family:'Antonio',sans-serif;font-weight:600;font-size:19px;letter-spacing:.04em;margin:30px 0 4px;text-transform:uppercase}
+  h2 .pts{font-size:12px;color:var(--text-mute);letter-spacing:.08em;margin-left:8px}
+  .sub{color:var(--text-dim);font-size:13px;margin-bottom:14px;line-height:1.5}
+  .grp-label{font-family:'Antonio',sans-serif;font-size:12px;letter-spacing:.12em;text-transform:uppercase;
+    color:var(--accent);margin:22px 0 8px;font-weight:500}
+  .updated{font-family:'Antonio',sans-serif;font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;
+    color:var(--text-mute);text-align:right;margin:10px 0 0}
+  .loading{padding:60px 0;text-align:center;color:var(--text-dim);font-family:'Antonio',sans-serif;
+    letter-spacing:.1em;text-transform:uppercase}
+  .banner{padding:12px 16px;border-radius:6px;margin:16px 0;font-family:'Antonio',sans-serif;
+    letter-spacing:.06em;text-transform:uppercase;font-size:13px;background:rgba(255,90,90,.12);
+    color:var(--bad);border:1px solid rgba(255,90,90,.4)}
+  .notice{padding:11px 14px;border-radius:6px;margin:14px 0;font-size:13px;color:var(--text-dim);
+    background:var(--card);border:1px dashed var(--border-strong)}
+
+  /* match rows */
+  .mrow{display:grid;grid-template-columns:minmax(190px,1.1fr) 86px minmax(180px,1fr);gap:10px;align-items:center;
+    background:var(--card);border:1px solid var(--border);border-radius:6px;padding:9px 12px;margin-bottom:7px}
+  .mrow.live{border-color:rgba(255,28,92,.45)}
+  .mteams{display:flex;align-items:center;gap:7px;font-family:'Antonio',sans-serif;font-size:15px;font-weight:600;letter-spacing:.04em}
+  .mteams .kit{width:4px;height:16px;border-radius:2px;flex:0 0 4px}
+  .mteams .vs{color:var(--text-mute);font-weight:300;font-size:12px}
+  .mid{text-align:center}
+  .mid .sc{font-family:'Cormorant Garamond',serif;font-size:21px;font-weight:700;font-variant-numeric:tabular-nums}
+  .mid .st{font-family:'Antonio',sans-serif;font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--text-mute);margin-top:1px}
+  .mid .st.live{color:var(--accent);animation:pulse 1.6s infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.45}}
+  .mpicks{display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap}
+
+  .chip{display:inline-flex;align-items:center;gap:5px;font-family:'Antonio',sans-serif;font-size:11.5px;
+    letter-spacing:.05em;text-transform:uppercase;border-radius:5px;padding:4px 8px;font-weight:600;
+    border:1px solid var(--border-strong);color:var(--text-dim);background:var(--card-soft)}
+  .chip .ow{width:7px;height:7px;border-radius:50%;flex:0 0 7px}
+  .chip.p1 .ow{background:var(--p1)} .chip.p2 .ow{background:var(--p2)}
+  .chip.hit{border-color:rgba(90,222,140,.5);color:var(--good)}
+  .chip.miss{border-color:rgba(255,90,90,.35);color:var(--text-mute);text-decoration:line-through}
+  .chip.tok{border-color:rgba(232,185,72,.55)}
+  .chip .tokmark{color:var(--gold);font-size:10px}
+  .chip .pts{color:var(--gold);font-size:10.5px}
+  .chip.hidden-pick{border-style:dashed;color:var(--text-mute);font-weight:400}
+
+  /* scoreboard category table */
+  .cats{display:grid;grid-template-columns:1fr auto auto;gap:0;background:var(--card);border:1px solid var(--border);
+    border-radius:8px;overflow:hidden;margin-top:14px}
+  .cats > div{padding:9px 14px;border-bottom:1px solid var(--border);font-size:13px}
+  .cats .hd{font-family:'Antonio',sans-serif;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--text-dim);background:var(--card-soft)}
+  .cats .num{font-family:'Cormorant Garamond',serif;font-size:17px;font-weight:600;text-align:right;font-variant-numeric:tabular-nums}
+  .cats .num.c1{color:var(--p1)} .cats .num.c2{color:var(--p2)}
+  .cats .tot{background:var(--card-soft);font-weight:600}
+
+  /* bracket ladder compare */
+  .ladder{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .ladder .side{background:var(--card);border:1px solid var(--border);border-radius:6px;padding:10px 12px}
+  .ladder .side h4{font-family:'Antonio',sans-serif;font-size:11px;letter-spacing:.14em;text-transform:uppercase;font-weight:500;margin-bottom:8px}
+  .ladder .side.s1 h4{color:var(--p1)} .ladder .side.s2 h4{color:var(--p2)}
+  .teamtags{display:flex;flex-wrap:wrap;gap:6px}
+  .ttag{display:inline-flex;align-items:center;gap:6px;font-family:'Antonio',sans-serif;font-size:13px;font-weight:600;
+    letter-spacing:.05em;border:1px solid var(--border-strong);border-radius:5px;padding:5px 9px;background:var(--card-soft)}
+  .ttag .kit{width:4px;height:14px;border-radius:2px}
+  .ttag.both{background:linear-gradient(90deg, rgba(78,201,176,0.13), rgba(197,134,192,0.13));border-color:var(--border-strong)}
+  .ttag.hit{border-color:rgba(90,222,140,.5)} .ttag.hit .code{color:var(--good)}
+  .ttag.miss{opacity:.45} .ttag.miss .code{text-decoration:line-through}
+  .ttag.tok{border-color:rgba(232,185,72,.55)}
+  .ttag .tokmark{color:var(--gold);font-size:10px}
+  .ttag .pts{color:var(--gold);font-family:'Antonio',sans-serif;font-size:10px}
+  .agree{font-family:'Antonio',sans-serif;font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--text-mute);margin:6px 0 0}
+
+  .dh{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px}
+  .dhcard{background:linear-gradient(180deg, rgba(232,185,72,0.08), rgba(232,185,72,0.02));
+    border:1px solid rgba(232,185,72,.35);border-radius:6px;padding:12px 14px;text-align:center}
+  .dhcard .who{font-family:'Antonio',sans-serif;font-size:10px;letter-spacing:.15em;text-transform:uppercase}
+  .dhcard.d1 .who{color:var(--p1)} .dhcard.d2 .who{color:var(--p2)}
+  .dhcard .tm{font-family:'Antonio',sans-serif;font-size:24px;font-weight:700;letter-spacing:.04em;margin-top:5px}
+  .dhcard .lad{font-family:'Antonio',sans-serif;font-size:10px;letter-spacing:.08em;color:var(--gold);margin-top:6px;text-transform:uppercase}
+
+  /* side bets */
+  .sgrow{display:grid;grid-template-columns:minmax(150px,1fr) 1fr 1fr minmax(90px,.8fr);gap:10px;align-items:center;
+    background:var(--card);border:1px solid var(--border);border-radius:6px;padding:9px 12px;margin-bottom:7px}
+  .sgrow .lab{font-family:'Antonio',sans-serif;font-size:12.5px;letter-spacing:.05em;color:var(--text-dim);text-transform:uppercase}
+  .sgrow .lab .bp{color:var(--text-mute);font-size:10.5px}
+  .sgrow .res{font-size:12.5px;color:var(--gold);text-align:right;font-family:'Antonio',sans-serif;letter-spacing:.04em}
+  .sgrow .res.pending{color:var(--text-mute)}
+  .sghead{display:grid;grid-template-columns:minmax(150px,1fr) 1fr 1fr minmax(90px,.8fr);gap:10px;padding:4px 12px;
+    font-family:'Antonio',sans-serif;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--text-mute)}
+  .note-line{grid-column:1/-1;font-size:12px;color:var(--text-dim);font-style:italic;border-top:1px dashed var(--border);padding-top:6px}
+
+  /* standings */
+  .stgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px}
+  table.st{width:100%;border-collapse:collapse;background:var(--card);border:1px solid var(--border);border-radius:6px;overflow:hidden}
+  table.st caption{font-family:'Antonio',sans-serif;font-size:12px;letter-spacing:.12em;text-transform:uppercase;
+    color:var(--accent);text-align:left;padding:8px 12px 6px;font-weight:500}
+  table.st th{font-family:'Antonio',sans-serif;font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;
+    color:var(--text-mute);font-weight:500;text-align:right;padding:3px 6px;border-bottom:1px solid var(--border)}
+  table.st th.tm,table.st td.tm{text-align:left}
+  table.st td{font-size:12.5px;padding:5px 6px;text-align:right;border-bottom:1px solid var(--border);font-variant-numeric:tabular-nums}
+  table.st tr:last-child td{border-bottom:none}
+  table.st td.tm{font-family:'Antonio',sans-serif;font-weight:600;letter-spacing:.04em;font-size:13px}
+  table.st td.ptscol{color:var(--gold);font-weight:600}
+
+  @media (max-width:680px){
+    .mrow{grid-template-columns:1fr 70px;grid-template-areas:"teams mid" "picks picks"}
+    .mrow .mteams{grid-area:teams} .mrow .mid{grid-area:mid} .mrow .mpicks{grid-area:picks;justify-content:flex-start;margin-top:4px}
+    .ladder,.dh{grid-template-columns:1fr}
+    .sgrow,.sghead{grid-template-columns:1fr 1fr;}
+    .sghead{display:none}
+    .sgrow .lab,.sgrow .res{grid-column:1/-1;text-align:left}
+    .h2h .score{font-size:30px}
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <div class="title">World Cup <span class="yr">26</span></div>
+    <div class="subtitle" id="subtitle">Andreas v Cal · Head-to-head</div>
+  </div>
+  <div class="h2h" id="h2h"></div>
+</div>
+
+<div class="topbar"><div class="tabs" id="tabs">
+  <button data-tab="board" class="on">Scoreboard</button>
+  <button data-tab="matches">Group matches</button>
+  <button data-tab="bracket">Brackets</button>
+  <button data-tab="side">Side bets</button>
+  <button data-tab="standings">Standings</button>
+</div></div>
+
+<div class="wrap">
+  <div id="err" class="banner" style="display:none"></div>
+  <div id="app"><div class="loading">Loading the pool…</div></div>
+  <div class="updated" id="updated"></div>
+</div>
+
+<script>
+/* ===================== PURE-START (node-testable, no DOM) ===================== */
+function outcomeOf(hs, as){ if(hs==null||as==null) return null; return hs>as?"Home":hs<as?"Away":"Draw"; }
+function tierOfSlot(slot){
+  if(!slot) return null;
+  if(slot==="Champion") return "Champion";
+  if(slot.indexOf("F-")===0) return "Finalist";
+  if(slot.indexOf("SF-")===0) return "SF";
+  if(slot.indexOf("QF-")===0) return "QF";
+  if(slot.indexOf("R16-")===0) return "R16";
+  return null;
+}
+var TIER_META = [
+  ["Champion","Champion","150 pts"],
+  ["Finalist","Finalists","40 pts each"],
+  ["SF","Semi-finalists","20 pts each"],
+  ["QF","Quarter-finalists","10 pts each"],
+  ["R16","Round of 16","5 pts each"],
+];
+function indexData(D){
+  var teamById={}; (D.teams||[]).forEach(function(t){ teamById[t.id]=t; });
+  var matchById={}; (D.matches||[]).forEach(function(m){ matchById[m.fixture_id]=m; });
+  var names=(D.players||[]).map(function(p){return p.name;});
+  var picksBy={};
+  names.forEach(function(n){ picksBy[n]={}; ((D.picks||{})[n]||[]).forEach(function(p){ picksBy[n][p.key]=p; }); });
+  return {teamById:teamById, matchById:matchById, names:names, picksBy:picksBy};
+}
+function bracketTiers(D){
+  var out={};
+  Object.keys(D.picks||{}).forEach(function(n){
+    (D.picks[n]||[]).forEach(function(p){
+      if(p.type!=="bracket_slot") return;
+      var t=tierOfSlot(p.bracket_slot); if(!t) return;
+      out[t]=out[t]||{}; out[t][n]=out[t][n]||[]; out[t][n].push(p);
+    });
+  });
+  return out;
+}
+function categoryTotals(D){
+  var res={};
+  (D.players||[]).forEach(function(pl){
+    var c={match:0,bracket:0,side:0,dark:0,rival:0};
+    ((D.picks||{})[pl.name]||[]).forEach(function(p){
+      var pts=p.points||0;
+      if(p.type==="match_outcome"||p.type==="match_exact_score") c.match+=pts;
+      else if(p.type==="bracket_slot") c.bracket+=pts;
+      else if(p.type==="dark_horse") c.dark+=pts;
+      else if(p.type==="side_game") c.side+=pts;
+      c.rival+=(p.rival_bonus||0);
+    });
+    c.total=c.match+c.bracket+c.side+c.dark+c.rival;
+    res[pl.name]=c;
+  });
+  return res;
+}
+function pickAnswer(p, teamById){
+  if(!p) return null;
+  if(p.team_id!=null && teamById[p.team_id]) return teamById[p.team_id].code||teamById[p.team_id].name;
+  if(p.player_name) return p.player_name;
+  if(p.text) return p.text;
+  if(p.scalar!=null) return String(p.scalar);
+  if(p.outcome) return p.outcome;
+  return null;
+}
+function matchPickState(p, m){
+  if(!p||!p.outcome) return {state:null};
+  if(!m||m.status!=="Finished") return {state:"pending",exact:false};
+  var oc=outcomeOf(m.home_score,m.away_score);
+  var hit=p.outcome===oc;
+  var exact=hit && p.score_home!=null && p.score_home===m.home_score && p.score_away===m.away_score;
+  return {state:hit?"hit":"miss",exact:exact};
+}
+function matchPickLabel(p, m){
+  if(!p||!p.outcome) return null;
+  var base=p.outcome==="Draw"?"Draw":(p.outcome==="Home"?(m&&m.home_code||"Home"):(m&&m.away_code||"Away"));
+  if(p.score_home!=null&&p.score_away!=null) base+=" "+p.score_home+":"+p.score_away;
+  return base;
+}
+/* ====================== PURE-END ====================== */
+
+var D=null, IDX=null, ACTIVE="board", LAST_FETCH=0;
+var $=function(s){return document.querySelector(s);};
+function esc(s){ return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+function P1(){ return D.players[0]||{}; } function P2(){ return D.players[1]||{}; }
+function cls(name){ return name===P1().name?"1":"2"; }
+
+function fmtKick(iso){
+  if(!iso) return "TBD";
+  var d=new Date(iso);
+  return d.toLocaleDateString(undefined,{weekday:"short",day:"numeric",month:"short"})+" · "+
+         d.toLocaleTimeString(undefined,{hour:"2-digit",minute:"2-digit"});
+}
+function tokmark(tok){
+  if(!tok) return "";
+  var m={Double:"×2",Triple:"×3",AllIn:"×5"}[tok]||tok;
+  return '<span class="tokmark">'+m+'</span>';
+}
+
+function header(){
+  var h="";
+  [P1(),P2()].forEach(function(p,i){
+    var t=p.tokens||{};
+    var toks=(t.Double!=null)?(t.Double+"D · "+t.Triple+"T · "+t.AllIn+"A"):"";
+    h+='<div class="col c'+(i+1)+'"><div class="name">'+esc(p.name)+'</div>'+
+       '<div class="score">'+(p.total_score||0)+'</div>'+
+       (toks?'<div class="meta">'+toks+' left</div>':'')+
+       '<div class="lockst '+(p.locked?'yes':'no')+'">'+(p.locked?'🔒 locked':'not locked')+'</div></div>';
+  });
+  $("#h2h").innerHTML=h;
+  if(P1().name&&P2().name) $("#subtitle").textContent=P1().name+" v "+P2().name+" · Head-to-head";
+  document.documentElement.style.setProperty("--p1", P1().color||"#4ec9b0");
+  document.documentElement.style.setProperty("--p2", P2().color||"#c586c0");
+}
+
+function pickChip(name, m){
+  var p=IDX.picksBy[name]?IDX.picksBy[name]["match|"+m.fixture_id]:null;
+  var pl=(name===P1().name)?P1():P2();
+  if(!pl.locked) return '<span class="chip hidden-pick"><span class="ow"></span>hidden</span>';
+  var lbl=matchPickLabel(p,m);
+  if(!lbl) return '<span class="chip hidden-pick p'+cls(name)+'"><span class="ow"></span>no pick</span>';
+  var st=matchPickState(p,m);
+  var c="chip p"+cls(name)+(st.state==="hit"?" hit":st.state==="miss"?" miss":"")+(p.token?" tok":"");
+  var pts=(p.points!=null&&m.status==="Finished")?'<span class="pts">+'+(p.points+(p.rival_bonus||0))+'</span>':"";
+  var note=p.note?' title="'+esc(p.note)+'"':"";
+  return '<span class="'+c+'"'+note+'><span class="ow"></span>'+esc(lbl)+(st.exact?" ◎":"")+tokmark(p.token)+pts+'</span>';
+}
+
+function matchRow(m){
+  var live=m.status==="Live";
+  var sc, st;
+  if(m.status==="Finished"||live){ sc=(m.home_score!=null?m.home_score:"–")+" : "+(m.away_score!=null?m.away_score:"–"); st=live?"live":(m.winner_method&&m.winner_method!=="Regulation"?m.winner_method:"FT"); }
+  else { sc="–"; st=fmtKick(m.kickoff); }
+  var kit=function(c){ return '<span class="kit" style="background:'+(c||"#444")+'"></span>'; };
+  var t1=IDX.teamById[m.home_id]||{}, t2=IDX.teamById[m.away_id]||{};
+  return '<div class="mrow'+(live?" live":"")+'">'+
+    '<div class="mteams">'+kit(t1.kit)+esc(m.home_code||m.home_name||"?")+
+      '<span class="vs">v</span>'+kit(t2.kit)+esc(m.away_code||m.away_name||"?")+'</div>'+
+    '<div class="mid"><div class="sc">'+sc+'</div><div class="st'+(live?" live":"")+'">'+esc(st)+'</div></div>'+
+    '<div class="mpicks">'+pickChip(P1().name,m)+pickChip(P2().name,m)+'</div></div>';
+}
+
+function boardTab(){
+  var h="";
+  var anyLocked=P1().locked||P2().locked;
+  if(!anyLocked) h+='<div class="notice">Picks appear here as each player locks. Scores start landing once the tournament kicks off on June 11.</div>';
+  else if(!P1().locked||!P2().locked){
+    var who=!P1().locked?P1().name:P2().name;
+    h+='<div class="notice">'+esc(who)+' hasn’t locked yet — their picks stay hidden until they do.</div>';
+  }
+
+  var live=D.matches.filter(function(m){return m.status==="Live";});
+  var fin=D.matches.filter(function(m){return m.status==="Finished";});
+  var up=D.matches.filter(function(m){return m.status!=="Finished"&&m.status!=="Live";});
+  if(live.length){ h+='<h2>Live now</h2>'; live.forEach(function(m){h+=matchRow(m);}); }
+  if(up.length){ h+='<h2>Up next</h2>'; up.slice(0,6).forEach(function(m){h+=matchRow(m);}); }
+  if(fin.length){ h+='<h2>Latest results</h2>'; fin.slice(-6).reverse().forEach(function(m){h+=matchRow(m);}); }
+
+  var cats=categoryTotals(D);
+  var c1=cats[P1().name]||{}, c2=cats[P2().name]||{};
+  h+='<h2>Points by category</h2>';
+  h+='<div class="cats">'+
+    '<div class="hd">Category</div><div class="hd num c1">'+esc(P1().name)+'</div><div class="hd num c2">'+esc(P2().name)+'</div>';
+  [["Match picks","match"],["Bracket ladder","bracket"],["Side games","side"],["Dark Horse","dark"],["Beat-rival bonus","rival"]].forEach(function(r){
+    h+='<div>'+r[0]+'</div><div class="num c1">'+(c1[r[1]]||0)+'</div><div class="num c2">'+(c2[r[1]]||0)+'</div>';
+  });
+  h+='<div class="tot">Total</div><div class="num c1 tot">'+(c1.total||0)+'</div><div class="num c2 tot">'+(c2.total||0)+'</div></div>';
+  return h;
+}
+
+function matchesTab(){
+  var h='<h2>Group matches <span class="pts">· 5 pts outcome · +10 exact</span></h2>'+
+        '<div class="sub">All 72 group fixtures with both players’ calls. ◎ marks an exact-score hit.</div>';
+  var byGroup={};
+  D.matches.forEach(function(m){ var g=m.group||"?"; (byGroup[g]=byGroup[g]||[]).push(m); });
+  Object.keys(byGroup).sort().forEach(function(g){
+    h+='<div class="grp-label">Group '+esc(g)+'</div>';
+    byGroup[g].sort(function(a,b){return (a.kickoff||"").localeCompare(b.kickoff||"");})
+      .forEach(function(m){ h+=matchRow(m); });
+  });
+  if(!D.matches.length) h+='<div class="notice">No fixtures loaded yet.</div>';
+  return h;
+}
+
+function ttag(p, name){
+  var t=IDX.teamById[p.team_id]||{};
+  var other=(name===P1().name)?P2().name:P1().name;
+  var otherHas=(D.picks[other]||[]).some(function(q){
+    return q.type==="bracket_slot" && tierOfSlot(q.bracket_slot)===tierOfSlot(p.bracket_slot) && q.team_id===p.team_id;
+  });
+  var c="ttag"+(otherHas?" both":"")+(p.token?" tok":"");
+  if(p.resolved) c+=(p.points>0?" hit":" miss");
+  var pts=(p.points!=null&&p.resolved)?'<span class="pts">+'+(p.points+(p.rival_bonus||0))+'</span>':"";
+  var note=p.note?' title="'+esc(p.note)+'"':"";
+  return '<span class="'+c+'"'+note+'><span class="kit" style="background:'+(t.kit||"#444")+'"></span>'+
+    '<span class="code">'+esc(t.code||t.name||"?")+'</span>'+tokmark(p.token)+pts+'</span>';
+}
+
+function bracketTab(){
+  var h='<h2>Bracket ladders <span class="pts">· side by side</span></h2>'+
+    '<div class="sub">Each player named the teams they expect to reach every knockout round — order-free, scored per team. '+
+    'A split background means both players picked that team. The full knockout tree view arrives once the draw exists (~June 26).</div>';
+  var tiers=bracketTiers(D);
+  var locked1=P1().locked, locked2=P2().locked;
+  if(!locked1&&!locked2) return h+'<div class="notice">Bracket ladders appear once players lock their picks.</div>';
+  TIER_META.forEach(function(tm){
+    var tier=tm[0], title=tm[1], pts=tm[2];
+    var t=tiers[tier]||{};
+    h+='<div class="grp-label">'+title+' <span style="color:var(--text-mute)">· '+pts+'</span></div>';
+    h+='<div class="ladder">';
+    [[P1(),"s1"],[P2(),"s2"]].forEach(function(pair){
+      var pl=pair[0];
+      var list=(t[pl.name]||[]).slice().sort(function(a,b){return (a.bracket_slot||"").localeCompare(b.bracket_slot||"",undefined,{numeric:true});});
+      h+='<div class="side '+pair[1]+'"><h4>'+esc(pl.name)+'</h4>';
+      if(!pl.locked) h+='<div class="agree">hidden until locked</div>';
+      else if(!list.length) h+='<div class="agree">no picks</div>';
+      else h+='<div class="teamtags">'+list.map(function(p){return ttag(p,pl.name);}).join("")+'</div>';
+      h+='</div>';
+    });
+    h+='</div>';
+    if(locked1&&locked2){
+      var l1=(t[P1().name]||[]).map(function(p){return p.team_id;});
+      var l2=(t[P2().name]||[]).map(function(p){return p.team_id;});
+      var shared=l1.filter(function(id){return id!=null&&l2.indexOf(id)>=0;}).length;
+      h+='<div class="agree">'+shared+' shared pick'+(shared===1?"":"s")+' in this round</div>';
+    }
+  });
+
+  // Dark Horse
+  var ladder="25 · 75 · 200 · 500 · 1000";
+  var dhGame=(D.sideGames||[]).filter(function(s){return s.name==="Dark Horse";})[0];
+  if(dhGame&&dhGame.dark_horse_ladder){
+    try{ var L=JSON.parse(dhGame.dark_horse_ladder); ladder=Object.values(L).join(" · "); }catch(e){}
+  }
+  h+='<h2>Dark Horse <span class="pts">· ladder '+ladder+'</span></h2>'+
+     '<div class="sub">One team outside the FIFA top 16 — points climb every knockout round they survive.</div><div class="dh">';
+  [[P1(),"d1"],[P2(),"d2"]].forEach(function(pair){
+    var pl=pair[0];
+    var p=pl.locked?(IDX.picksBy[pl.name]||{})["darkhorse"]:null;
+    var t=p?(IDX.teamById[p.team_id]||{}):{};
+    h+='<div class="dhcard '+pair[1]+'"><div class="who">'+esc(pl.name)+'</div>'+
+       '<div class="tm">'+(pl.locked?esc(t.code||"—"):"hidden")+'</div>'+
+       (t.name?'<div class="lad">'+esc(t.name)+(p&&p.token?" · "+p.token:"")+(p&&p.points!=null?' · +'+p.points+' so far':'')+'</div>':"")+
+       '</div>';
+  });
+  return h+'</div>';
+}
+
+function sideTab(){
+  var h='<h2>Side bets</h2><div class="sub">Season-long calls. Resolutions land as the tournament reveals them.</div>';
+  h+='<div class="sghead"><div>Game</div><div>'+esc(P1().name)+'</div><div>'+esc(P2().name)+'</div><div style="text-align:right">Result</div></div>';
+  var order=(D.sideGames||[]).slice().sort(function(a,b){
+    var ga=(a.name||"").indexOf("Top Scorer Group")===0?1:0, gb=(b.name||"").indexOf("Top Scorer Group")===0?1:0;
+    return ga-gb || (a.name||"").localeCompare(b.name||"");
+  });
+  order.forEach(function(sg){
+    if(sg.name==="Dark Horse") return;  // lives on the bracket tab
+    var notes="";
+    var cells=[P1(),P2()].map(function(pl,i){
+      if(!pl.locked) return '<span class="chip hidden-pick"><span class="ow"></span>hidden</span>';
+      var p=((D.picks[pl.name])||[]).filter(function(q){return q.type==="side_game"&&q.side_game===sg.name;})[0];
+      if(!p) return '<span class="chip hidden-pick p'+(i+1)+'"><span class="ow"></span>no pick</span>';
+      var ans=pickAnswer(p,IDX.teamById)||"—";
+      var c="chip p"+(i+1)+(p.token?" tok":"")+(p.resolved?(p.points>0?" hit":" miss"):"");
+      var pts=(p.points!=null&&p.resolved)?'<span class="pts">+'+(p.points+(p.rival_bonus||0))+'</span>':"";
+      if(p.note) notes+='<div class="note-line">'+esc(pl.name)+': “'+esc(p.note)+'”</div>';
+      return '<span class="'+c+'"><span class="ow"></span>'+esc(ans)+tokmark(p.token)+pts+'</span>';
+    });
+    h+='<div class="sgrow"><div class="lab">'+esc(sg.name)+' <span class="bp">· '+(sg.base_points||0)+'</span></div>'+
+       '<div>'+cells[0]+'</div><div>'+cells[1]+'</div>'+
+       '<div class="res'+(sg.resolved_value?"":" pending")+'">'+(sg.resolved_value?esc(sg.resolved_value):"—")+'</div>'+
+       notes+'</div>';
+  });
+  return h;
+}
+
+function standingsTab(){
+  var h='<h2>Group standings</h2><div class="sub">Straight from the official tables, refreshed daily (15-minutely on match days).</div>';
+  if(!(D.standings||[]).length) return h+'<div class="notice">Standings appear once the group stage starts.</div>';
+  var byGroup={};
+  D.standings.forEach(function(s){ var g=s.group||"?"; (byGroup[g]=byGroup[g]||[]).push(s); });
+  h+='<div class="stgrid">';
+  Object.keys(byGroup).sort().forEach(function(g){
+    h+='<table class="st"><caption>Group '+esc(g)+'</caption>'+
+       '<tr><th class="tm">Team</th><th>P</th><th>W</th><th>D</th><th>L</th><th>GD</th><th>Pts</th></tr>';
+    byGroup[g].sort(function(a,b){return (a.rank||99)-(b.rank||99);}).forEach(function(s){
+      var t=IDX.teamById[s.team_id]||{};
+      h+='<tr><td class="tm">'+esc(t.code||t.name||"?")+'</td><td>'+(s.played!=null?s.played:0)+'</td>'+
+         '<td>'+(s.win!=null?s.win:0)+'</td><td>'+(s.draw!=null?s.draw:0)+'</td><td>'+(s.loss!=null?s.loss:0)+'</td>'+
+         '<td>'+(s.gd!=null?s.gd:0)+'</td><td class="ptscol">'+(s.points!=null?s.points:0)+'</td></tr>';
+    });
+    h+='</table>';
+  });
+  return h+'</div>';
+}
+
+function render(){
+  header();
+  var fn={board:boardTab, matches:matchesTab, bracket:bracketTab, side:sideTab, standings:standingsTab}[ACTIVE];
+  $("#app").innerHTML='<div class="tabpanel active">'+fn()+'</div>';
+  var d=new Date(LAST_FETCH);
+  $("#updated").textContent="updated "+d.toLocaleTimeString(undefined,{hour:"2-digit",minute:"2-digit",second:"2-digit"});
+}
+
+function setTab(name){
+  ACTIVE=name;
+  document.querySelectorAll("#tabs button").forEach(function(b){ b.classList.toggle("on", b.dataset.tab===name); });
+  if(D) render();
+}
+document.addEventListener("click",function(e){
+  var b=e.target.closest&&e.target.closest("#tabs button");
+  if(b) setTab(b.dataset.tab);
+});
+
+async function refresh(){
+  try{
+    var demo=new URLSearchParams(location.search).get("demo");
+    if(demo){ D=demoData(); }
+    else{
+      var res=await fetch("/api/public");
+      var j=await res.json();
+      if(!res.ok) throw new Error(j.error||"load failed");
+      D=j;
+    }
+    IDX=indexData(D);
+    LAST_FETCH=Date.now();
+    $("#err").style.display="none";
+    render();
+  }catch(err){
+    $("#err").textContent="⚠ Couldn’t refresh: "+err.message;
+    $("#err").style.display="block";
+    if(!D) $("#app").innerHTML="";
+  }
+}
+refresh();
+setInterval(refresh, 90000);
+document.addEventListener("visibilitychange",function(){
+  if(document.visibilityState==="visible" && Date.now()-LAST_FETCH>30000) refresh();
+});
+
+/* ---- offline demo payload (?demo=1) — lets the page be eyeballed with no API ---- */
+function demoData(){
+  var teams=[
+    {id:1,code:"MEX",name:"Mexico",group:"A",kit:"#0a7d3c"},{id:2,code:"CRO",name:"Croatia",group:"A",kit:"#d52b1e"},
+    {id:3,code:"KOR",name:"South Korea",group:"A",kit:"#0b1f5e"},{id:4,code:"RSA",name:"South Africa",group:"A",kit:"#007a4d"},
+    {id:5,code:"ESP",name:"Spain",group:"B",kit:"#c60b1e"},{id:6,code:"NED",name:"Netherlands",group:"B",kit:"#ff6a00"},
+    {id:7,code:"JPN",name:"Japan",group:"B",kit:"#1c2b6b"},{id:8,code:"USA",name:"USA",group:"B",kit:"#3b5bbf"},
+  ];
+  var matches=[
+    {fixture_id:100,round:"Group Stage - 1",group:"A",kickoff:"2026-06-11T20:00:00Z",status:"Finished",home_id:1,home_code:"MEX",away_id:2,away_code:"CRO",home_score:2,away_score:1,winner_id:1,winner_method:"Regulation"},
+    {fixture_id:101,round:"Group Stage - 1",group:"A",kickoff:"2026-06-12T17:00:00Z",status:"Live",home_id:4,home_code:"RSA",away_id:3,away_code:"KOR",home_score:0,away_score:1},
+    {fixture_id:102,round:"Group Stage - 1",group:"B",kickoff:"2026-06-12T20:00:00Z",status:"Finished",home_id:5,home_code:"ESP",away_id:6,away_code:"NED",home_score:1,away_score:1},
+    {fixture_id:103,round:"Group Stage - 2",group:"B",kickoff:"2026-06-13T18:00:00Z",status:"Scheduled",home_id:7,home_code:"JPN",away_id:8,away_code:"USA"},
+    {fixture_id:104,round:"Group Stage - 2",group:"A",kickoff:"2026-06-14T15:00:00Z",status:"Scheduled",home_id:1,home_code:"MEX",away_id:4,away_code:"RSA"},
+  ];
+  var standings=[
+    {group:"A",rank:1,team_id:1,played:1,win:1,draw:0,loss:0,gf:2,ga:1,gd:1,points:3,form:"W"},
+    {group:"A",rank:2,team_id:3,played:1,win:0,draw:0,loss:0,gd:0,points:0},
+    {group:"A",rank:3,team_id:4,played:1,win:0,draw:0,loss:0,gd:0,points:0},
+    {group:"A",rank:4,team_id:2,played:1,win:0,draw:0,loss:1,gf:1,ga:2,gd:-1,points:0,form:"L"},
+    {group:"B",rank:1,team_id:5,played:1,win:0,draw:1,loss:0,gf:1,ga:1,gd:0,points:1,form:"D"},
+    {group:"B",rank:2,team_id:6,played:1,win:0,draw:1,loss:0,gf:1,ga:1,gd:0,points:1,form:"D"},
+  ];
+  var sideGames=[
+    {name:"Golden Boot",base_points:60,resolution_type:"player",resolved_value:null},
+    {name:"Total Tournament Goals",base_points:30,resolution_type:"scalar",resolved_value:null},
+    {name:"First Red Card",base_points:30,resolution_type:"event_player",resolved_value:"J. Ramírez (MEX)"},
+    {name:"Dark Horse",base_points:0,resolution_type:"team",dark_horse_ladder:'{"R32":25,"R16":75,"QF":200,"SF":500,"Final":1000}'},
+    {name:"Top Scorer Group A",base_points:15,resolution_type:"player",resolved_value:null},
+  ];
+  var picksA=[
+    {key:"Champion",type:"bracket_slot",bracket_slot:"Champion",team_id:5,token:"AllIn",points:null,resolved:false},
+    {key:"F-1",type:"bracket_slot",bracket_slot:"F-1",team_id:5,points:null,resolved:false},
+    {key:"F-2",type:"bracket_slot",bracket_slot:"F-2",team_id:6,points:null,resolved:false},
+    {key:"SF-1",type:"bracket_slot",bracket_slot:"SF-1",team_id:5},{key:"SF-2",type:"bracket_slot",bracket_slot:"SF-2",team_id:6},
+    {key:"SF-3",type:"bracket_slot",bracket_slot:"SF-3",team_id:1,token:"Double"},{key:"SF-4",type:"bracket_slot",bracket_slot:"SF-4",team_id:8},
+    {key:"darkhorse",type:"dark_horse",side_game:"Dark Horse",team_id:7},
+    {key:"match|100",type:"match_outcome",match_id:100,outcome:"Home",score_home:2,score_away:1,token:"Double",points:30,rival_bonus:3,resolved:true,note:"Easy opener for El Tri."},
+    {key:"match|101",type:"match_outcome",match_id:101,outcome:"Draw"},
+    {key:"match|102",type:"match_outcome",match_id:102,outcome:"Home",points:0,resolved:true},
+    {key:"match|103",type:"match_outcome",match_id:103,outcome:"Away",score_home:0,score_away:2},
+    {key:"side|Golden Boot",type:"side_game",side_game:"Golden Boot",player_name:"E. Haaland"},
+    {key:"side|Total Tournament Goals",type:"side_game",side_game:"Total Tournament Goals",scalar:145},
+    {key:"side|First Red Card",type:"side_game",side_game:"First Red Card",text:"S. Ramos Jr.",points:0,resolved:true},
+  ];
+  var picksC=[
+    {key:"Champion",type:"bracket_slot",bracket_slot:"Champion",team_id:6,token:"Triple"},
+    {key:"F-1",type:"bracket_slot",bracket_slot:"F-1",team_id:6},{key:"F-2",type:"bracket_slot",bracket_slot:"F-2",team_id:5},
+    {key:"SF-1",type:"bracket_slot",bracket_slot:"SF-1",team_id:5},{key:"SF-2",type:"bracket_slot",bracket_slot:"SF-2",team_id:6},
+    {key:"SF-3",type:"bracket_slot",bracket_slot:"SF-3",team_id:7},{key:"SF-4",type:"bracket_slot",bracket_slot:"SF-4",team_id:2},
+    {key:"darkhorse",type:"dark_horse",side_game:"Dark Horse",team_id:3,token:"Double"},
+    {key:"match|100",type:"match_outcome",match_id:100,outcome:"Away",points:0,resolved:true},
+    {key:"match|101",type:"match_outcome",match_id:101,outcome:"Away"},
+    {key:"match|102",type:"match_outcome",match_id:102,outcome:"Draw",score_home:1,score_away:1,points:15,resolved:true,note:"Two cagey sides."},
+    {key:"match|104",type:"match_outcome",match_id:104,outcome:"Home"},
+    {key:"side|Golden Boot",type:"side_game",side_game:"Golden Boot",player_name:"K. Mbappé"},
+    {key:"side|Total Tournament Goals",type:"side_game",side_game:"Total Tournament Goals",scalar:152},
+    {key:"side|First Red Card",type:"side_game",side_game:"First Red Card",text:"J. Ramírez",token:"Double",points:60,resolved:true,note:"He plays angry."},
+  ];
+  return {
+    generated_at:new Date().toISOString(),
+    players:[
+      {name:"Andreas",color:"#4ec9b0",total_score:33,tokens:{Double:2,Triple:2,AllIn:0},mulligans:1,locked:true,locked_at:"2026-06-09T10:00:00Z"},
+      {name:"Cal",color:"#c586c0",total_score:75,tokens:{Double:2,Triple:0,AllIn:1},mulligans:1,locked:true,locked_at:"2026-06-10T08:00:00Z"},
+    ],
+    teams:teams, matches:matches, standings:standings, sideGames:sideGames,
+    picks:{Andreas:picksA, Cal:picksC},
+  };
+}
+</script>
+</body>
+</html>

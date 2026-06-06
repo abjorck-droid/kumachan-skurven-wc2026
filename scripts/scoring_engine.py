@@ -33,7 +33,7 @@ ROOT = Path(__file__).resolve().parent.parent
 REST = "https://api.airtable.com/v0"
 WRITE_PAUSE = 0.2
 
-# ---- scoring config (edit here; mirrors 03_Scoring_spec_v0.1.md) ------------
+# ---- scoring config (edit here; mirrors 03_Scoring_spec_v1.0.md) ------------
 MATCH_PTS = {
     "group":      {"outcome": 5,  "exact": 10},
     "R32":        {"outcome": 10, "exact": 15},

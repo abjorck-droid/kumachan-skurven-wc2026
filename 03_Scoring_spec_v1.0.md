@@ -1,8 +1,13 @@
 # Scoring & Mechanics Spec — World Cup 2026 Bracket
 
-Version 0.1. Designed for two players (Andreas vs. Cal), 48-team World Cup, "full sicko mode" side games, broadcast-aesthetic UI.
+**Version 1.0 — LOCKED 2026-06-06 by Andreas & Cal.** Designed for two players (Andreas vs. Cal), 48-team World Cup, "full sicko mode" side games, broadcast-aesthetic UI.
 
 This is the source-of-truth doc the front-end, the scoring engine, and the UI copy all derive from. Edit here first, then code.
+
+**Changelog**
+
+- **v1.0 (2026-06-06)** — Locked. One value changed from the draft: **Champion bonus 100 → 150**. Every other point value and mechanic confirmed as drafted. Lock semantics corrected: knockout per-match picks cannot lock at tournament kickoff (pairings don't exist until the group stage ends) — they lock per-match, if/when that entry flow is built. Editorial pass same day: player-specific phrasing neutralized so the doc reads identically for both players (the "Beat-Cal bonus" is now the **Beat-Rival bonus**); no rule changes.
+- v0.1 (2026-05-19) — first draft.
 
 ---
 
@@ -129,7 +134,7 @@ A bonus bet on a given match only scores if **both players have attached at leas
 
 Once both have opted in, each player's individual bets are scored independently on their own correctness — bet types and values do not have to match.
 
-Strategic implication: because per-match bonus bets are hidden until kickoff, the decision to opt-in to a match happens blind. You're betting on which matches Cal will also find interesting enough to engage with. This kills the "stack 100 bonus bets and rack up free points" strategy without enabling reactive play.
+Strategic implication: because per-match bonus bets are hidden until kickoff, the decision to opt-in to a match happens blind. Each player is betting on which matches the other player will also find interesting enough to engage with. This kills the "stack 100 bonus bets and rack up free points" strategy without enabling reactive play.
 
 Bet types and payouts (all binary, all 10–20 points):
 
@@ -158,13 +163,13 @@ The full mechanic:
 - Once attached, a token cannot be moved or unspent.
 - Tokens are **revealed to the opponent at lock time** of the prediction they're attached to (consistent with the visibility rules — same-time-as-pick).
 
-This makes token placement a strategic act. The All-In, in particular, is a single-shot signal of conviction, visible to your rival the moment the relevant prediction locks.
+This makes token placement a strategic act. The All-In, in particular, is a single-shot signal of conviction, visible to the other player the moment the relevant prediction locks.
 
 ---
 
 ## Mechanics
 
-### Beat-Cal bonus (every match)
+### Beat-Rival bonus (every match)
 
 For every match (group stage, R32, R16, QF, SF, Final), if one player correctly predicts the outcome **and** the other doesn't, the correct player gets a **+3 bonus** on top of the base score.
 
@@ -216,8 +221,9 @@ When used:
 
 | What | Locks |
 |---|---|
-| Bracket (R32 through Final, Champion, Dark Horse, all season-long side games, all group-stage and knockout outcome/score picks) | **At tournament kickoff** (2026-06-11) |
-| Per-match bonus bets | **At that match's kickoff** |
+| Bracket ladder (R16 through Champion), Dark Horse, all season-long side games, all 72 group-stage outcome/score picks | **At tournament kickoff** (2026-06-11) |
+| Knockout outcome/score picks (pairings unknown until the group stage ends) | **At that match's kickoff** — entry flow not yet built; in/out decision pending |
+| Per-match bonus bets | **At that match's kickoff** — entry flow not yet built; in/out decision pending |
 | Mulligan use | **Window: June 26–28** (after group stage, before R32) |
 
 Nothing locks before tournament start except the tournament itself. Once kickoff happens, nearly everything is set in stone.
@@ -237,9 +243,11 @@ These are decided-no-for-now, with rationale:
 
 ---
 
-## Open scoring questions before code
+## Resolutions at the v1.0 lock (2026-06-06)
 
-1. **Champion bonus.** RESOLVED 2026-06-06 → **150** (was 100). Andreas + Cal wanted the champion to feel like THE big bracket call and offset a pile of smaller misses. 150 keeps it ~1.9 full bracket tiers and, critically, keeps an All-In champion (5×150 = 750) below the Dark Horse's signature 1000 ceiling, preserving the risk/reward hierarchy. 200 was the considered cap (would tie the All-In Dark Horse) but rejected for flattening that distinction.
-2. **Beat-Cal bonus value.** I picked +3 to keep it from dominating. Sanity check: across 64 matches, max 192 H2H bonus = roughly the same magnitude as guessing 4 quarter-final winners correctly. Feels balanced.
-3. **All-In on a 5-point pick = 25 points.** Is that worth the token? Probably not — implies you should save All-In for high-base-value picks like the Champion (5× 150 = 750) or Dark Horse pick on a deep run.
-4. **Total tournament goals.** "Closest without going over" punishes over-estimation. Alternative is "closest in either direction." Closest-without-going-over is more interesting because it forces you to commit to a lower bound. Keep as proposed unless you push back.
+The four questions left open in v0.1, now settled:
+
+1. **Champion bonus → 150** (was 100). Andreas + Cal wanted the champion to feel like THE big bracket call, able to offset a pile of smaller misses. 150 makes it worth ~1.9 full bracket tiers (and 30 group-match outcomes), and — critically — keeps an All-In champion (5×150 = 750) *below* the Dark Horse's signature 1000 ceiling, preserving the risk/reward hierarchy. 200 was the considered cap (an All-In champion would tie an All-In Dark Horse winning it all) and was rejected for flattening that distinction.
+2. **Beat-Rival bonus → +3, confirmed.** Across 64 scoreable matches, the 192-point max is roughly the magnitude of guessing 4 quarter-final winners — present but not dominant.
+3. **All-In strategy note stands:** an All-In on a 5-point group pick yields only 25 — the token is built for high-base picks (Champion = 750, or a Dark Horse on a deep run).
+4. **Total tournament goals → "closest without going over," confirmed.** Forces a committed lower bound rather than rewarding hedged overshoots.

@@ -109,7 +109,7 @@ const TOKEN_OPTS = [["","— no token —"],["Double","Double ×2"],["Triple","T
 const START = {Double:4, Triple:2, AllIn:1};
 
 const BRACKET = [
-  {title:"Champion", pts:"100 pts", slots:[["Champion","Champion"]]},
+  {title:"Champion", pts:"150 pts", slots:[["Champion","Champion"]]},
   {title:"Finalists", pts:"40 pts each", slots:[["F-1","Finalist 1"],["F-2","Finalist 2"]]},
   {title:"Semi-finalists", pts:"20 pts each", slots:[1,2,3,4].map(i=>["SF-"+i,"Semi-finalist "+i])},
   {title:"Quarter-finalists", pts:"10 pts each", slots:[1,2,3,4,5,6,7,8].map(i=>["QF-"+i,"Quarter-finalist "+i])},
@@ -242,7 +242,7 @@ function render(){
     <h2 style="margin-top:0">Review &amp; lock</h2>
     <div class="summary" id="summary"></div>
     <button class="btn lock" id="lockBtn">Lock my picks</button>
-    <div class="hint">Locking stamps every pick immutable and reveals them to your opponent (except pundit notes). You can keep editing &amp; saving across all tabs until you lock.</div>
+    <div class="hint">Locking stamps every pick immutable and reveals them to your opponent (except pundit notes). You can keep editing &amp; saving across all tabs until you lock. Once locked, follow the pool on the <a href="/live.html" style="color:var(--gold)">live board</a>.</div>
   </div>`;
 
   $("#app").innerHTML =
