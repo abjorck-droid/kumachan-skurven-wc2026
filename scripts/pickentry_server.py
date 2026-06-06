@@ -81,8 +81,9 @@ def at_upsert(table, records, merge_on):
     return n
 
 # ---- pure transform (unit-tested) ------------------------------------------
-def prediction_fields(player, pick, team_map, player_rec, sidegame_map):
+def prediction_fields(player, pick, team_map, player_rec, sidegame_map, footballer_map=None):
     """Build one Predictions record's fields from a client pick dict."""
+    footballer_map = footballer_map or {}
     rec = {"label": f"{player}|{pick['key']}", "pool_player": [player_rec],
            "prediction_type": pick["type"]}
     if pick.get("bracket_slot"):
@@ -91,7 +92,12 @@ def prediction_fields(player, pick, team_map, player_rec, sidegame_map):
         rec["side_game"] = [sidegame_map[pick["side_game"]]]
     if pick.get("team_id") is not None and int(pick["team_id"]) in team_map:
         rec["predicted_team"] = [team_map[int(pick["team_id"])]]
-    if pick.get("player_text"):
+    # player picks: prefer a real Footballers link; fall back to free text if squads
+    # aren't imported yet (or the chosen id isn't in the table).
+    pid = pick.get("player_id")
+    if pid not in (None, "") and str(pid).isdigit() and int(pid) in footballer_map:
+        rec["predicted_player"] = [footballer_map[int(pid)]]
+    elif pick.get("player_text"):
         rec["predicted_text"] = pick["player_text"]
     if pick.get("scalar") is not None and pick["scalar"] != "":
         rec["predicted_scalar"] = pick["scalar"]
@@ -119,6 +125,8 @@ def get_player(name):
 def bootstrap(player):
     team_recs = at_list("Teams", fields=["team_id", "code", "name", "group"])
     rec2tid = {r["id"]: r["fields"].get("team_id") for r in team_recs}
+    team_by_rec = {r["id"]: {"code": r["fields"].get("code"), "group": r["fields"].get("group")}
+                   for r in team_recs}
     teams = [{"id": r["fields"].get("team_id"), "code": r["fields"].get("code"),
               "name": r["fields"].get("name"), "group": r["fields"].get("group")}
              for r in team_recs if r["fields"].get("team_id") is not None]
@@ -126,6 +134,23 @@ def bootstrap(player):
     side = [{"name": r["fields"].get("name"), "base_points": r["fields"].get("base_points"),
              "resolution_type": r["fields"].get("resolution_type")}
             for r in at_list("SideGames", fields=["name", "base_points", "resolution_type"])]
+    # Footballers (empty until import_squads.py runs → UI falls back to free text).
+    footballers, rec2pid = [], {}
+    try:
+        for r in at_list("Footballers", fields=["player_id", "name", "position", "shirt_number", "team"]):
+            f = r.get("fields", {})
+            pid = f.get("player_id")
+            if pid is None:
+                continue
+            rec2pid[r["id"]] = pid
+            link = f.get("team") or []
+            tinfo = team_by_rec.get(link[0], {}) if link else {}
+            footballers.append({"player_id": pid, "name": f.get("name"), "position": f.get("position"),
+                                "shirt_number": f.get("shirt_number"),
+                                "team_code": tinfo.get("code"), "group": tinfo.get("group")})
+        footballers.sort(key=lambda x: ((x.get("group") or "Z"), (x.get("team_code") or ""), (x.get("name") or "")))
+    except Exception:
+        footballers, rec2pid = [], {}
     prow = get_player(player)
     pf = (prow or {}).get("fields", {})
     existing = []
@@ -135,14 +160,17 @@ def bootstrap(player):
         lbl = f.get("label", "")
         if lbl.startswith(player + "|"):
             link = f.get("predicted_team") or []
+            plink = f.get("predicted_player") or []
             existing.append({"key": lbl.split("|", 1)[1], "type": f.get("prediction_type"),
                              "bracket_slot": f.get("bracket_slot"),
                              "team_id": rec2tid.get(link[0]) if link else None,
+                             "player_id": rec2pid.get(plink[0]) if plink else None,
                              "player_text": f.get("predicted_text"), "scalar": f.get("predicted_scalar"),
                              "token": f.get("confidence_token"), "note": f.get("pundit_note")})
             if f.get("locked_at"):
                 locked = True
     return {"player": player, "players": ["Andreas", "Cal"], "teams": teams, "sideGames": side,
+            "footballers": footballers,
             "tokensStart": START_TOKENS, "locked": locked, "existing": existing,
             "tokensRemaining": {"Double": pf.get("tokens_remaining_double", 4),
                                 "Triple": pf.get("tokens_remaining_triple", 2),
@@ -156,7 +184,9 @@ def save(player, picks):
     team_map = {int(r["fields"]["team_id"]): r["id"]
                 for r in at_list("Teams", fields=["team_id"]) if r["fields"].get("team_id") is not None}
     sg_map = {r["fields"].get("name"): r["id"] for r in at_list("SideGames", fields=["name"])}
-    records = [prediction_fields(player, p, team_map, player_rec, sg_map) for p in picks if p.get("key")]
+    foot_map = {int(r["fields"]["player_id"]): r["id"]
+                for r in at_list("Footballers", fields=["player_id"]) if r["fields"].get("player_id") is not None}
+    records = [prediction_fields(player, p, team_map, player_rec, sg_map, foot_map) for p in picks if p.get("key")]
     n = at_upsert("Predictions", records, ["label"]) if records else 0
     used = token_counts(picks)
     at("PATCH", f"{BASE}/PoolPlayers", {"records": [{"id": player_rec, "fields": {

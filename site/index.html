@@ -93,9 +93,10 @@ const BRACKET = [
   {title:"Quarter-finalists", pts:"10 pts each", slots:[1,2,3,4,5,6,7,8].map(i=>["QF-"+i,"Quarter-finalist "+i])},
   {title:"Round of 16", pts:"5 pts each", slots:Array.from({length:16},(_,i)=>["R16-"+(i+1),"R16 team "+(i+1)])},
 ];
-const SIDE_TEXT = [
-  ["Golden Boot",60,"Player name"],["Golden Glove",60,"Goalkeeper name"],
-  ["First Red Card",30,"Player name"],["First Own Goal",40,"Player name"],
+// name, points, player-filter ("all" | "gk"), free-text placeholder fallback
+const SIDE_PLAYER = [
+  ["Golden Boot",60,"all","Player name"],["Golden Glove",60,"gk","Goalkeeper name"],
+  ["First Red Card",30,"all","Player name"],["First Own Goal",40,"all","Player name"],
 ];
 const GROUPS = "ABCDEFGHIJKL".split("");
 
@@ -133,6 +134,25 @@ function teamRow(key,label){ const v=(VALUES[key]||{}).team_id;
   return row(key,label,`<select data-key="${key}" data-role="team">${teamOptions(v)}</select>`); }
 function textRow(key,label,ph){ const v=(VALUES[key]||{}).player_text||"";
   return row(key,label,`<input data-key="${key}" data-role="text" placeholder="${ph}" value="${v.replace(/"/g,'&quot;')}">`); }
+function hasFootballers(){ return !!(DATA && DATA.footballers && DATA.footballers.length); }
+function playerOptions(sel, filter){
+  let list = DATA.footballers;
+  if(filter==="gk") list = list.filter(p=>p.position==="G");
+  else if(filter && filter.length===1) list = list.filter(p=>p.group===filter);  // group letter
+  let h='<option value="">— select player —</option>', grp=null;
+  list.forEach(p=>{
+    const label = p.team_code || (p.group?('Group '+p.group):'?');
+    if(label!==grp){ if(grp!==null) h+='</optgroup>'; grp=label; h+=`<optgroup label="${label}">`; }
+    const tag=[p.position,(p.shirt_number!=null?'#'+p.shirt_number:null)].filter(Boolean).join(' ');
+    h+=`<option value="${p.player_id}" ${String(p.player_id)===String(sel)?'selected':''}>${p.name}${tag?(' · '+tag):''}</option>`;
+  });
+  return h + (grp!==null?'</optgroup>':'');
+}
+function playerRow(key,label,filter,ph){
+  if(hasFootballers()){ const v=(VALUES[key]||{}).player_id;
+    return row(key,label,`<select data-key="${key}" data-role="player">${playerOptions(v,filter)}</select>`); }
+  return textRow(key,label,ph);   // graceful fallback before the squad import runs
+}
 function numRow(key,label){ const v=(VALUES[key]||{}).scalar; const vv=(v===undefined||v===null)?"":v;
   return row(key,label,`<input type="number" min="0" data-key="${key}" data-role="scalar" placeholder="e.g. 145" value="${vv}">`); }
 
@@ -146,14 +166,17 @@ function render(){
     g.slots.forEach(([key,label])=>{ META[key]={type:"bracket_slot",bracket_slot:key}; h += teamRow(key,label); });
   });
   // Side games
-  h += `<h2>Side games</h2><div class="sub">Season-long calls, locked at kickoff. Player names are free text for now (squad dropdowns come after the squad import).</div>`;
-  SIDE_TEXT.forEach(([name,pts,ph])=>{ const key="side|"+name; META[key]={type:"side_game",side_game:name};
-    h += textRow(key, `${name} · ${pts}`, ph); });
+  const sgSub = hasFootballers()
+    ? "Season-long calls, locked at kickoff. Player picks are real squad dropdowns."
+    : "Season-long calls, locked at kickoff. Player names are free text until the squad import runs.";
+  h += `<h2>Side games</h2><div class="sub">${sgSub}</div>`;
+  SIDE_PLAYER.forEach(([name,pts,filter,ph])=>{ const key="side|"+name; META[key]={type:"side_game",side_game:name};
+    h += playerRow(key, `${name} · ${pts}`, filter, ph); });
   { const key="side|Total Tournament Goals"; META[key]={type:"side_game",side_game:"Total Tournament Goals"};
     h += numRow(key,"Total Goals · 30"); }
   h += `<div class="grp-label">Per-group top scorer · 15 pts each</div>`;
   GROUPS.forEach(g=>{ const name="Top Scorer Group "+g, key="side|"+name; META[key]={type:"side_game",side_game:name};
-    h += textRow(key, "Group "+g, "Top scorer"); });
+    h += playerRow(key, "Group "+g, g, "Top scorer"); });
   // Dark horse
   h += `<h2>Dark Horse <span class="pts">· ladder up to 1000 pts</span></h2><div class="sub">One team, ranked outside the FIFA top 16 at lock. The spiciest pick in the game — an All-In here is the boldest move available.</div>`;
   META["darkhorse"]={type:"dark_horse",side_game:"Dark Horse"};
@@ -180,7 +203,7 @@ function updateReserves(){
   }).join('');
 }
 function updateSummary(){
-  const total=Object.values(VALUES).filter(v=>v.team_id||v.player_text||v.scalar!==undefined&&v.scalar!==""||v.token).length;
+  const total=Object.values(VALUES).filter(v=>v.team_id||v.player_id||v.player_text||v.scalar!==undefined&&v.scalar!==""||v.token).length;
   const used=countTokens();
   const el=$("#summary"); if(!el) return;
   el.innerHTML = `<span>Picks made <b>${total}</b></span>
@@ -192,6 +215,7 @@ function onChange(e){
   const key=e.target.dataset.key, role=e.target.dataset.role; if(!key||LOCKED) return;
   VALUES[key] = VALUES[key] || {};
   if(role==="team"){ VALUES[key].team_id = e.target.value || undefined; }
+  else if(role==="player"){ VALUES[key].player_id = e.target.value || undefined; }
   else if(role==="text"){ VALUES[key].player_text = e.target.value || undefined; }
   else if(role==="scalar"){ VALUES[key].scalar = e.target.value===""?undefined:Number(e.target.value); }
   else if(role==="note"){ VALUES[key].note = e.target.value || undefined; }
@@ -216,12 +240,13 @@ function flash(msg){ const s=$("#status"); s.textContent="⚠ "+msg; s.style.col
 function collectPicks(){
   return Object.keys(META).map(key=>{
     const v=VALUES[key]||{}; const m=META[key];
-    const has = v.team_id||v.player_text||(v.scalar!==undefined&&v.scalar!=="")||v.token||v.note;
+    const has = v.team_id||v.player_id||v.player_text||(v.scalar!==undefined&&v.scalar!=="")||v.token||v.note;
     if(!has) return null;
     const p={key, type:m.type};
     if(m.bracket_slot) p.bracket_slot=m.bracket_slot;
     if(m.side_game) p.side_game=m.side_game;
     if(v.team_id) p.team_id=v.team_id;
+    if(v.player_id) p.player_id=v.player_id;
     if(v.player_text) p.player_text=v.player_text;
     if(v.scalar!==undefined&&v.scalar!=="") p.scalar=v.scalar;
     if(v.token) p.token=v.token;
@@ -266,7 +291,8 @@ async function loadPlayer(player){
     DATA=await res.json(); if(!res.ok) throw new Error(DATA.error||"load failed");
     LOCKED=!!DATA.locked;
     (DATA.existing||[]).forEach(p=>{ VALUES[p.key]={
-      team_id:p.team_id!=null?String(p.team_id):undefined, player_text:p.player_text||undefined,
+      team_id:p.team_id!=null?String(p.team_id):undefined,
+      player_id:p.player_id!=null?String(p.player_id):undefined, player_text:p.player_text||undefined,
       scalar:(p.scalar!=null?p.scalar:undefined), token:p.token||undefined, note:p.note||undefined }; });
     render();
   }catch(err){ $("#app").innerHTML=""; showErr("Couldn't load — is the base built & server running? ("+err.message+")"); }
