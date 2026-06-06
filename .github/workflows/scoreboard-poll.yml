@@ -1,0 +1,33 @@
+name: scoreboard-poll
+
+# Live fixtures + scores + events → Airtable, every 15 minutes.
+# Keys come from repo secrets (Settings → Secrets and variables → Actions):
+#   API_FOOTBALL_KEY, AIRTABLE_PAT, AIRTABLE_BASE_ID
+# The script self-skips outside the tournament window, so 24/7 cron is safe.
+# Tip: use a PUBLIC repo (code only — picks live in Airtable) for unlimited Action minutes,
+# or disable this workflow outside June 11 – July 19.
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"      # every 15 min (UTC)
+  workflow_dispatch: {}          # manual "Run workflow" button
+
+concurrency:
+  group: scoreboard-poll
+  cancel-in-progress: false
+
+jobs:
+  poll:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Run scoreboard poller
+        env:
+          API_FOOTBALL_KEY: ${{ secrets.API_FOOTBALL_KEY }}
+          AIRTABLE_PAT: ${{ secrets.AIRTABLE_PAT }}
+          AIRTABLE_BASE_ID: ${{ secrets.AIRTABLE_BASE_ID }}
+        run: python scripts/poller.py --mode scoreboard

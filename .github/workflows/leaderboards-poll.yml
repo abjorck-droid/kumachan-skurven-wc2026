@@ -1,0 +1,30 @@
+name: leaderboards-poll
+
+# Group standings → Airtable, once per day (04:10 UTC).
+# Same repo secrets as scoreboard-poll: API_FOOTBALL_KEY, AIRTABLE_PAT, AIRTABLE_BASE_ID.
+# Self-skips outside the tournament window.
+
+on:
+  schedule:
+    - cron: "10 4 * * *"        # daily at 04:10 UTC
+  workflow_dispatch: {}
+
+concurrency:
+  group: leaderboards-poll
+  cancel-in-progress: false
+
+jobs:
+  poll:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Run leaderboards poller
+        env:
+          API_FOOTBALL_KEY: ${{ secrets.API_FOOTBALL_KEY }}
+          AIRTABLE_PAT: ${{ secrets.AIRTABLE_PAT }}
+          AIRTABLE_BASE_ID: ${{ secrets.AIRTABLE_BASE_ID }}
+        run: python scripts/poller.py --mode leaderboards

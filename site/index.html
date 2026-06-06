@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>World Cup 2026 — Pick Entry</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Antonio:wght@300;400;500;600;700&family=Cormorant+Garamond:wght@500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0a0b10; --card:#14161d; --card-soft:#1a1d26; --border:rgba(255,255,255,0.08);
+    --border-strong:rgba(255,255,255,0.16); --text:#f0f0f3; --text-dim:#8a8c94; --text-mute:#5a5c64;
+    --accent:#ff1c5c; --gold:#e8b948; --gold-soft:rgba(232,185,72,0.14);
+    --andreas:#4ec9b0; --andreas-soft:rgba(78,201,176,0.14); --cal:#c586c0; --cal-soft:rgba(197,134,192,0.16);
+    --good:#5ade8c; --bad:#ff5a5a;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:'Inter',-apple-system,sans-serif;-webkit-font-smoothing:antialiased;padding-bottom:80px}
+  .wrap{max-width:760px;margin:0 auto;padding:0 18px}
+
+  /* sticky header */
+  .topbar{position:sticky;top:0;z-index:20;background:rgba(10,11,16,0.92);backdrop-filter:blur(10px);border-bottom:1px solid var(--border)}
+  .topbar-in{max-width:760px;margin:0 auto;padding:14px 18px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+  .brand{font-family:'Antonio',sans-serif;font-weight:600;font-size:22px;letter-spacing:.02em}
+  .brand .yr{color:var(--accent);font-weight:700}
+  .seg{display:flex;border:1px solid var(--border-strong);border-radius:6px;overflow:hidden}
+  .seg button{background:transparent;border:none;cursor:pointer;font-family:'Antonio',sans-serif;font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--text-dim);padding:7px 14px;font-weight:500}
+  .seg button+button{border-left:1px solid var(--border)}
+  .seg button.on{background:var(--andreas-soft);color:var(--andreas)}
+  .seg button.cal.on{background:var(--cal-soft);color:var(--cal)}
+  .reserves{display:flex;gap:10px;margin-left:auto;align-items:center}
+  .chip{font-family:'Antonio',sans-serif;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--gold);background:var(--gold-soft);border:1px solid rgba(232,185,72,.3);border-radius:5px;padding:5px 9px;font-weight:600}
+  .chip.empty{color:var(--text-mute);background:transparent;border-color:var(--border)}
+  .btn{font-family:'Antonio',sans-serif;font-size:12px;letter-spacing:.1em;text-transform:uppercase;font-weight:600;border:none;border-radius:6px;padding:9px 16px;cursor:pointer}
+  .btn.save{background:var(--accent);color:#fff}
+  .btn.save:disabled{opacity:.5;cursor:default}
+  .status{font-size:12px;color:var(--text-dim);min-height:16px;font-family:'Antonio',sans-serif;letter-spacing:.06em}
+
+  /* sections */
+  h2{font-family:'Antonio',sans-serif;font-weight:600;font-size:20px;letter-spacing:.04em;margin:34px 0 4px;text-transform:uppercase}
+  h2 .pts{font-size:12px;color:var(--text-mute);letter-spacing:.08em;margin-left:8px}
+  .sub{color:var(--text-dim);font-size:13px;margin-bottom:14px;line-height:1.5}
+  .grp-label{font-family:'Antonio',sans-serif;font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin:20px 0 8px;font-weight:500}
+
+  .row{display:grid;grid-template-columns:120px 1fr 122px;gap:10px;align-items:center;background:var(--card);border:1px solid var(--border);border-radius:6px;padding:10px 12px;margin-bottom:8px}
+  .row.tokened{border-color:rgba(232,185,72,.4)}
+  .row .lab{font-family:'Antonio',sans-serif;font-size:13px;letter-spacing:.05em;color:var(--text-dim);text-transform:uppercase}
+  .row .note{grid-column:2 / 4;margin-top:2px}
+  select,input{width:100%;background:var(--card-soft);border:1px solid var(--border-strong);border-radius:5px;color:var(--text);font-family:'Inter',sans-serif;font-size:14px;padding:8px 10px;outline:none}
+  select:focus,input:focus{border-color:var(--andreas)}
+  input.note-in{font-size:13px;color:var(--text-dim);border-style:dashed}
+  select[data-role=token]{font-family:'Antonio',sans-serif;font-size:12px;letter-spacing:.06em;text-transform:uppercase}
+  .row.tokened select[data-role=token]{color:var(--gold);border-color:rgba(232,185,72,.5)}
+
+  .lockbar{margin:36px 0 10px;padding:18px;border:1px solid var(--border-strong);border-radius:8px;background:var(--card)}
+  .lockbar .summary{display:flex;gap:22px;flex-wrap:wrap;font-family:'Antonio',sans-serif;font-size:13px;letter-spacing:.06em;color:var(--text-dim);text-transform:uppercase;margin-bottom:14px}
+  .lockbar .summary b{color:var(--text);font-size:18px;font-family:'Cormorant Garamond',serif}
+  .btn.lock{background:var(--gold);color:#1a1500}
+  .banner{display:none;padding:12px 16px;border-radius:6px;margin:16px 0;font-family:'Antonio',sans-serif;letter-spacing:.06em;text-transform:uppercase;font-size:13px}
+  .banner.locked{display:block;background:var(--gold-soft);color:var(--gold);border:1px solid rgba(232,185,72,.4)}
+  .banner.err{display:block;background:rgba(255,90,90,.12);color:var(--bad);border:1px solid rgba(255,90,90,.4)}
+  .hint{font-size:12px;color:var(--text-mute);margin-top:6px}
+  .loading{padding:60px 0;text-align:center;color:var(--text-dim);font-family:'Antonio',sans-serif;letter-spacing:.1em;text-transform:uppercase}
+</style>
+</head>
+<body>
+<div class="topbar"><div class="topbar-in">
+  <div class="brand">World Cup <span class="yr">26</span> · Picks</div>
+  <div class="seg" id="playerSeg">
+    <button data-player="Andreas" class="on">Andreas</button>
+    <button data-player="Cal" class="cal">Cal</button>
+  </div>
+  <div class="reserves" id="reserves"></div>
+  <button class="btn save" id="saveBtn">Save</button>
+  <span class="status" id="status"></span>
+</div></div>
+
+<div class="wrap">
+  <div id="lockBanner" class="banner locked">🔒 This bracket is locked — view only.</div>
+  <div id="errBanner" class="banner err"></div>
+  <div id="app"><div class="loading">Loading picks…</div></div>
+</div>
+
+<script>
+const TOKEN_OPTS = [["","— no token —"],["Double","Double ×2"],["Triple","Triple ×3"],["AllIn","All-In ×5"]];
+const START = {Double:4, Triple:2, AllIn:1};
+
+const BRACKET = [
+  {title:"Champion", pts:"100 pts", slots:[["Champion","Champion"]]},
+  {title:"Finalists", pts:"40 pts each", slots:[["F-1","Finalist 1"],["F-2","Finalist 2"]]},
+  {title:"Semi-finalists", pts:"20 pts each", slots:[1,2,3,4].map(i=>["SF-"+i,"Semi-finalist "+i])},
+  {title:"Quarter-finalists", pts:"10 pts each", slots:[1,2,3,4,5,6,7,8].map(i=>["QF-"+i,"Quarter-finalist "+i])},
+  {title:"Round of 16", pts:"5 pts each", slots:Array.from({length:16},(_,i)=>["R16-"+(i+1),"R16 team "+(i+1)])},
+];
+const SIDE_TEXT = [
+  ["Golden Boot",60,"Player name"],["Golden Glove",60,"Goalkeeper name"],
+  ["First Red Card",30,"Player name"],["First Own Goal",40,"Player name"],
+];
+const GROUPS = "ABCDEFGHIJKL".split("");
+
+let DATA = null, META = {}, VALUES = {}, PLAYER = "Andreas", LOCKED = false;
+
+const $ = s => document.querySelector(s);
+function teamOptions(sel){
+  let h = '<option value="">— select team —</option>';
+  let g = null;
+  DATA.teams.forEach(t=>{
+    if(t.group !== g){ if(g!==null) h+='</optgroup>'; g=t.group; h+=`<optgroup label="Group ${g||'?'}">`; }
+    h += `<option value="${t.id}" ${String(t.id)===String(sel)?'selected':''}>${t.code?t.code+' · ':''}${t.name}</option>`;
+  });
+  return h + '</optgroup>';
+}
+function tokenSelect(key){
+  const v = (VALUES[key]||{}).token || "";
+  return `<select data-key="${key}" data-role="token">` +
+    TOKEN_OPTS.map(([val,lab])=>`<option value="${val}" ${val===v?'selected':''}>${lab}</option>`).join('') + `</select>`;
+}
+function noteInput(key){
+  const v = (VALUES[key]||{}).note || "";
+  return `<input class="note-in" data-key="${key}" data-role="note" placeholder="Pundit note (optional, hidden until it resolves)" value="${v.replace(/"/g,'&quot;')}">`;
+}
+function row(key, label, controlHTML){
+  const tokened = (VALUES[key]||{}).token ? ' tokened' : '';
+  return `<div class="row${tokened}" id="row-${key}">
+    <span class="lab">${label}</span>
+    ${controlHTML}
+    ${tokenSelect(key)}
+    ${noteInput(key)}
+  </div>`;
+}
+function teamRow(key,label){ const v=(VALUES[key]||{}).team_id;
+  return row(key,label,`<select data-key="${key}" data-role="team">${teamOptions(v)}</select>`); }
+function textRow(key,label,ph){ const v=(VALUES[key]||{}).player_text||"";
+  return row(key,label,`<input data-key="${key}" data-role="text" placeholder="${ph}" value="${v.replace(/"/g,'&quot;')}">`); }
+function numRow(key,label){ const v=(VALUES[key]||{}).scalar; const vv=(v===undefined||v===null)?"":v;
+  return row(key,label,`<input type="number" min="0" data-key="${key}" data-role="scalar" placeholder="e.g. 145" value="${vv}">`); }
+
+function render(){
+  META = {};
+  let h = "";
+  // Bracket
+  h += `<h2>Bracket slots</h2><div class="sub">Name the teams you think reach each round — independent of who they actually play. Stacks with match picks.</div>`;
+  BRACKET.forEach(g=>{
+    h += `<div class="grp-label">${g.title} <span style="color:var(--text-mute)">· ${g.pts}</span></div>`;
+    g.slots.forEach(([key,label])=>{ META[key]={type:"bracket_slot",bracket_slot:key}; h += teamRow(key,label); });
+  });
+  // Side games
+  h += `<h2>Side games</h2><div class="sub">Season-long calls, locked at kickoff. Player names are free text for now (squad dropdowns come after the squad import).</div>`;
+  SIDE_TEXT.forEach(([name,pts,ph])=>{ const key="side|"+name; META[key]={type:"side_game",side_game:name};
+    h += textRow(key, `${name} · ${pts}`, ph); });
+  { const key="side|Total Tournament Goals"; META[key]={type:"side_game",side_game:"Total Tournament Goals"};
+    h += numRow(key,"Total Goals · 30"); }
+  h += `<div class="grp-label">Per-group top scorer · 15 pts each</div>`;
+  GROUPS.forEach(g=>{ const name="Top Scorer Group "+g, key="side|"+name; META[key]={type:"side_game",side_game:name};
+    h += textRow(key, "Group "+g, "Top scorer"); });
+  // Dark horse
+  h += `<h2>Dark Horse <span class="pts">· ladder up to 1000 pts</span></h2><div class="sub">One team, ranked outside the FIFA top 16 at lock. The spiciest pick in the game — an All-In here is the boldest move available.</div>`;
+  META["darkhorse"]={type:"dark_horse",side_game:"Dark Horse"};
+  h += teamRow("darkhorse","Dark Horse");
+  // Review / lock
+  h += `<div class="lockbar">
+    <h2 style="margin-top:0">Review &amp; lock</h2>
+    <div class="summary" id="summary"></div>
+    <button class="btn lock" id="lockBtn">Lock my bracket</button>
+    <div class="hint">Locking stamps every pick immutable and reveals them to your opponent (except pundit notes). You can keep editing &amp; saving until you lock.</div>
+  </div>`;
+  $("#app").innerHTML = h;
+  updateReserves(); updateSummary();
+  if(LOCKED) setLockedUI();
+}
+
+function countTokens(){ const c={Double:0,Triple:0,AllIn:0};
+  Object.values(VALUES).forEach(v=>{ if(v.token && c[v.token]!==undefined) c[v.token]++; }); return c; }
+function updateReserves(){
+  const used=countTokens(); const r=$("#reserves");
+  r.innerHTML = Object.entries(START).map(([k,tot])=>{
+    const left=tot-used[k]; const lab=k==="AllIn"?"A":k[0];
+    return `<span class="chip ${left===0?'empty':''}">${lab} ${left}/${tot}</span>`;
+  }).join('');
+}
+function updateSummary(){
+  const total=Object.values(VALUES).filter(v=>v.team_id||v.player_text||v.scalar!==undefined&&v.scalar!==""||v.token).length;
+  const used=countTokens();
+  const el=$("#summary"); if(!el) return;
+  el.innerHTML = `<span>Picks made <b>${total}</b></span>
+    <span>Tokens placed <b>${used.Double+used.Triple+used.AllIn}/7</b></span>
+    <span>Double <b>${used.Double}/4</b></span><span>Triple <b>${used.Triple}/2</b></span><span>All-In <b>${used.AllIn}/1</b></span>`;
+}
+
+function onChange(e){
+  const key=e.target.dataset.key, role=e.target.dataset.role; if(!key||LOCKED) return;
+  VALUES[key] = VALUES[key] || {};
+  if(role==="team"){ VALUES[key].team_id = e.target.value || undefined; }
+  else if(role==="text"){ VALUES[key].player_text = e.target.value || undefined; }
+  else if(role==="scalar"){ VALUES[key].scalar = e.target.value===""?undefined:Number(e.target.value); }
+  else if(role==="note"){ VALUES[key].note = e.target.value || undefined; }
+  else if(role==="token"){
+    const prev = VALUES[key].token || "";
+    const attempted = e.target.value;
+    VALUES[key].token = attempted || undefined;
+    const used=countTokens();
+    if(Object.entries(START).some(([k,t])=>used[k]>t)){
+      VALUES[key].token = prev||undefined; e.target.value = prev;   // revert — over budget
+      const L={Double:"Double",Triple:"Triple",AllIn:"All-In"};
+      flash("No "+(L[attempted]||attempted)+" tokens left");
+    }
+    document.getElementById("row-"+key).classList.toggle("tokened", !!VALUES[key].token);
+    updateReserves();
+  }
+  updateSummary();
+}
+function flash(msg){ const s=$("#status"); s.textContent="⚠ "+msg; s.style.color="var(--bad)";
+  setTimeout(()=>{ s.textContent=""; s.style.color=""; },2200); }
+
+function collectPicks(){
+  return Object.keys(META).map(key=>{
+    const v=VALUES[key]||{}; const m=META[key];
+    const has = v.team_id||v.player_text||(v.scalar!==undefined&&v.scalar!=="")||v.token||v.note;
+    if(!has) return null;
+    const p={key, type:m.type};
+    if(m.bracket_slot) p.bracket_slot=m.bracket_slot;
+    if(m.side_game) p.side_game=m.side_game;
+    if(v.team_id) p.team_id=v.team_id;
+    if(v.player_text) p.player_text=v.player_text;
+    if(v.scalar!==undefined&&v.scalar!=="") p.scalar=v.scalar;
+    if(v.token) p.token=v.token;
+    if(v.note) p.pundit_note=v.note;
+    return p;
+  }).filter(Boolean);
+}
+
+async function save(){
+  const btn=$("#saveBtn"), s=$("#status"); btn.disabled=true; s.style.color=""; s.textContent="Saving…";
+  try{
+    const picks=collectPicks();
+    const res=await fetch("/api/save",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({player:PLAYER,picks})});
+    const j=await res.json(); if(!res.ok) throw new Error(j.error||"save failed");
+    s.style.color="var(--good)"; s.textContent=`Saved ✓ ${j.saved} picks`;
+  }catch(err){ s.style.color="var(--bad)"; s.textContent="Save failed: "+err.message; }
+  finally{ btn.disabled=false; setTimeout(()=>{ if($("#status").textContent.startsWith("Saved")) $("#status").textContent=""; },3000); }
+}
+async function lockBracket(){
+  if(!confirm("Lock "+PLAYER+"'s bracket? Picks become immutable and visible to your opponent.")) return;
+  await save();
+  try{
+    const res=await fetch("/api/lock",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({player:PLAYER})});
+    const j=await res.json(); if(!res.ok) throw new Error(j.error||"lock failed");
+    LOCKED=true; setLockedUI();
+  }catch(err){ showErr("Lock failed: "+err.message); }
+}
+function setLockedUI(){
+  $("#lockBanner").style.display="block";
+  document.querySelectorAll("select,input").forEach(el=>{ if(!el.closest(".seg")) el.disabled=true; });
+  const lb=$("#lockBtn"); if(lb){ lb.disabled=true; lb.textContent="Locked"; lb.style.opacity=".5"; }
+}
+function showErr(m){ const b=$("#errBanner"); b.textContent="⚠ "+m; b.style.display="block"; setTimeout(()=>b.style.display="none",5000); }
+
+async function loadPlayer(player){
+  PLAYER=player; LOCKED=false; VALUES={};
+  $("#lockBanner").style.display="none";
+  $("#app").innerHTML='<div class="loading">Loading '+player+"'s picks…</div>";
+  try{
+    const res=await fetch("/api/bootstrap?player="+encodeURIComponent(player));
+    DATA=await res.json(); if(!res.ok) throw new Error(DATA.error||"load failed");
+    LOCKED=!!DATA.locked;
+    (DATA.existing||[]).forEach(p=>{ VALUES[p.key]={
+      team_id:p.team_id!=null?String(p.team_id):undefined, player_text:p.player_text||undefined,
+      scalar:(p.scalar!=null?p.scalar:undefined), token:p.token||undefined, note:p.note||undefined }; });
+    render();
+  }catch(err){ $("#app").innerHTML=""; showErr("Couldn't load — is the base built & server running? ("+err.message+")"); }
+}
+
+$("#app").addEventListener("change", onChange);
+$("#app").addEventListener("input", e=>{ if(["text","note","scalar"].includes(e.target.dataset.role)) onChange(e); });
+document.addEventListener("click", e=>{
+  if(e.target.id==="saveBtn") save();
+  if(e.target.id==="lockBtn") lockBracket();
+  if(e.target.dataset.player){
+    document.querySelectorAll("#playerSeg button").forEach(b=>b.classList.remove("on"));
+    e.target.classList.add("on"); loadPlayer(e.target.dataset.player);
+  }
+});
+loadPlayer("Andreas");
+</script>
+</body>
+</html>

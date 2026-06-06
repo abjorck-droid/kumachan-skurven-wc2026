@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>World Cup 2026 — Bracket Mockup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Antonio:wght@300;400;500;600;700&family=Cormorant+Garamond:wght@400;500;600;700&family=Architects+Daughter&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0b10;
+    --card: #14161d;
+    --card-soft: #1a1d26;
+    --border: rgba(255,255,255,0.07);
+    --border-strong: rgba(255,255,255,0.14);
+    --line: rgba(255,255,255,0.16);
+    --text: #f0f0f3;
+    --text-dim: #8a8c94;
+    --text-mute: #5a5c64;
+    --accent: #ff1c5c;
+    --accent-soft: rgba(255,28,92,0.12);
+    --gold: #e8b948;
+    --gold-soft: rgba(232,185,72,0.12);
+    --andreas: #4ec9b0;
+    --andreas-soft: rgba(78,201,176,0.14);
+    --cal: #c586c0;
+    --cal-soft: rgba(197,134,192,0.16);
+    --good: #5ade8c;
+
+    --chip-h: 58px;
+    --col-w: 158px;
+    --bracket-h: 760px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background:
+      radial-gradient(1200px 600px at 50% -10%, rgba(255,28,92,0.06), transparent 60%),
+      var(--bg);
+    color: var(--text);
+    font-family: 'Inter', -apple-system, sans-serif;
+    padding: 28px 20px 48px;
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1480px; margin: 0 auto; }
+
+  /* HEADER ---------------------------------------------------- */
+  .header {
+    display: flex; justify-content: space-between; align-items: flex-end;
+    padding: 0 4px 22px; border-bottom: 1px solid var(--border); margin-bottom: 18px;
+  }
+  .title { font-family: 'Antonio', sans-serif; font-weight: 600; font-size: 30px; line-height: 1; letter-spacing: 0.02em; }
+  .title .yr { color: var(--accent); font-weight: 700; }
+  .subtitle {
+    font-family: 'Antonio', sans-serif; font-weight: 300; font-size: 13px; color: var(--text-dim);
+    letter-spacing: 0.14em; text-transform: uppercase; margin-top: 5px;
+  }
+  .h2h-totals { display: flex; gap: 26px; font-family: 'Cormorant Garamond', serif; }
+  .h2h-totals .col { text-align: right; }
+  .h2h-totals .col .name {
+    font-family: 'Antonio', sans-serif; font-size: 11px; letter-spacing: 0.15em;
+    color: var(--text-dim); text-transform: uppercase; font-weight: 400;
+  }
+  .h2h-totals .col .score {
+    font-size: 34px; line-height: 1; font-weight: 500; margin-top: 4px;
+    font-variant-numeric: tabular-nums; font-feature-settings: 'tnum';
+  }
+  .h2h-totals .andreas .score { color: var(--andreas); }
+  .h2h-totals .cal .score { color: var(--cal); }
+  .h2h-totals .col .tokens {
+    font-family: 'Antonio', sans-serif; font-size: 11px; letter-spacing: 0.14em;
+    color: var(--gold); text-transform: uppercase; margin-top: 8px; font-weight: 500;
+  }
+
+  /* TOOLBAR --------------------------------------------------- */
+  .toolbar { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px; margin-bottom: 18px; }
+  .toolbar-left { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+  .view-label { font-family: 'Antonio', sans-serif; font-size: 13px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-dim); font-weight: 400; }
+  .view-label b { font-weight: 600; color: var(--text); }
+  .toggle { display: flex; border: 1px solid var(--border-strong); border-radius: 6px; overflow: hidden; }
+  .toggle button {
+    background: transparent; border: none; cursor: pointer; font-family: 'Antonio', sans-serif;
+    font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-dim);
+    padding: 8px 15px; font-weight: 500; transition: background .15s, color .15s;
+  }
+  .toggle button + button { border-left: 1px solid var(--border); }
+  .toggle button[data-mode].active { background: var(--andreas-soft); color: var(--andreas); }
+  .toggle button[data-mode="C"].active { background: var(--cal-soft); color: var(--cal); }
+  .toggle button[data-mode="H"].active { background: rgba(255,255,255,0.08); color: var(--text); }
+  .toggle button[data-zoom].active { background: rgba(255,28,92,0.14); color: var(--accent); }
+
+  .legend { display: flex; gap: 16px; font-family: 'Antonio', sans-serif; font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-mute); flex-wrap: wrap; }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .legend .sw { width: 14px; height: 5px; border-radius: 2px; display: inline-block; }
+  .legend .sw.a { background: var(--andreas); }
+  .legend .sw.c { background: var(--cal); }
+  .legend .sw.both { background: linear-gradient(90deg, var(--andreas) 50%, var(--cal) 50%); }
+  .legend .sw.tok { background: var(--gold); }
+
+  .scroll-hint { font-family: 'Antonio', sans-serif; font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-mute); text-align: center; margin: 0 0 12px; }
+
+  /* SCROLL / FIT FRAME --------------------------------------- */
+  .scroll { overflow-x: auto; overflow-y: hidden; padding-bottom: 14px; -webkit-overflow-scrolling: touch; }
+  .scroll::-webkit-scrollbar { height: 8px; }
+  .scroll::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 4px; }
+  .fitbox { position: relative; }
+
+  /* BRACKET --------------------------------------------------- */
+  .bracket { position: relative; display: flex; align-items: stretch; height: var(--bracket-h); min-width: 1380px; }
+  #wires { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 0; }
+  .col { display: flex; flex-direction: column; width: var(--col-w); flex: 0 0 var(--col-w); z-index: 1; }
+  .col.final-col { width: 196px; flex: 0 0 196px; }
+  .col-head {
+    font-family: 'Antonio', sans-serif; font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--text-mute); text-align: center; padding-bottom: 12px; font-weight: 500; height: 30px;
+  }
+  .col.final-col .col-head { color: var(--accent); }
+  .col-body { flex: 1; display: flex; flex-direction: column; justify-content: space-around; padding: 0 9px; }
+
+  /* MATCH CHIP ------------------------------------------------ */
+  .match { position: relative; background: var(--card); border: 1px solid var(--border); border-radius: 5px; box-shadow: 0 1px 0 rgba(0,0,0,0.3); }
+  .slot { display: flex; align-items: center; gap: 8px; padding: 7px 9px; height: calc(var(--chip-h) / 2); position: relative; }
+  .slot + .slot { border-top: 1px solid var(--border); }
+  .slot .kit { width: 4px; height: 18px; border-radius: 2px; flex: 0 0 4px; }
+  .slot .code { font-family: 'Antonio', sans-serif; font-size: 15px; font-weight: 600; letter-spacing: 0.05em; line-height: 1; min-width: 34px; }
+  .slot .src { font-family: 'Antonio', sans-serif; font-size: 9.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-mute); margin-left: auto; white-space: nowrap; font-weight: 400; }
+
+  /* advancer highlight — single player */
+  .slot.pa { background: var(--andreas-soft); }
+  .slot.pa .code { color: var(--andreas); }
+  .slot.pa::before { content:''; position:absolute; left:0; top:0; bottom:0; width:2px; background: var(--andreas); }
+  .slot.pc { background: var(--cal-soft); }
+  .slot.pc .code { color: var(--cal); }
+  .slot.pc::before { content:''; position:absolute; left:0; top:0; bottom:0; width:2px; background: var(--cal); }
+  /* consensus (both agree) — symmetric split bar, neutral text */
+  .slot.pboth { background: linear-gradient(90deg, rgba(78,201,176,0.13), rgba(197,134,192,0.13)); }
+  .slot.pboth .code { color: var(--text); }
+  .slot.pboth::before { content:''; position:absolute; left:0; top:0; bottom:0; width:3px; background: linear-gradient(180deg, var(--andreas) 50%, var(--cal) 50%); }
+  .slot.dim .code { color: var(--text-dim); }
+  .slot.dim .kit { opacity: 0.5; }
+
+  /* token badge — space reserved on the relevant slot so source label stays clear */
+  .match.tok { border-color: rgba(232,185,72,0.45); }
+  .match.tok .slot.tok-row { padding-right: 78px; }
+  .tok-tag {
+    position: absolute; top: -1px; right: -1px; display: flex; align-items: center; gap: 5px;
+    background: var(--gold); color: #1a1500; font-family: 'Antonio', sans-serif; font-size: 9px;
+    letter-spacing: 0.08em; text-transform: uppercase; font-weight: 700; padding: 3px 7px;
+    border-radius: 0 4px 0 5px; z-index: 3; line-height: 1;
+  }
+  .tok-tag .ow { width: 6px; height: 6px; border-radius: 50%; display: inline-block; }
+  .tok-tag .ow.a { background: #0a3a32; box-shadow: 0 0 0 1.5px var(--andreas) inset, 0 0 0 1px rgba(0,0,0,0.4); background: var(--andreas); }
+  .tok-tag .ow.c { background: var(--cal); }
+
+  /* FINAL + CHAMPION ----------------------------------------- */
+  .final-col .col-body { justify-content: center; gap: 16px; }
+  .champion { text-align: center; padding: 13px 10px 15px; background: linear-gradient(180deg, rgba(232,185,72,0.10), rgba(232,185,72,0.02)); border: 1px solid rgba(232,185,72,0.35); border-radius: 6px; }
+  .champion .trophy { font-size: 22px; line-height: 1; color: var(--gold); }
+  .champion .lab { font-family: 'Antonio', sans-serif; font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--gold); margin: 7px 0 6px; font-weight: 500; }
+  .champion .team { font-family: 'Antonio', sans-serif; font-size: 28px; font-weight: 700; letter-spacing: 0.04em; line-height: 1; color: var(--text); }
+  .champion .team-name { font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-dim); margin-top: 5px; }
+  /* compare champion: two backers, equal weight */
+  .champ-cmp { display: flex; flex-direction: column; gap: 9px; margin-top: 8px; }
+  .champ-cmp .row { display: flex; align-items: center; justify-content: center; gap: 8px; }
+  .champ-cmp .who { font-family: 'Antonio', sans-serif; font-size: 9px; letter-spacing: 0.14em; text-transform: uppercase; }
+  .champ-cmp .row.a .who { color: var(--andreas); } .champ-cmp .row.c .who { color: var(--cal); }
+  .champ-cmp .row .tm { font-family: 'Antonio', sans-serif; font-size: 22px; font-weight: 700; letter-spacing: 0.04em; }
+  .champ-cmp .row.a .tm { color: var(--andreas); } .champ-cmp .row.c .tm { color: var(--cal); }
+
+  .final-match { box-shadow: 0 0 0 1px rgba(255,28,92,0.25), 0 6px 24px rgba(0,0,0,0.5); }
+  .final-match .slot { height: 34px; }
+  .final-match .slot .code { font-size: 17px; }
+  .thirdplace { margin-top: 2px; border: 1px dashed var(--border-strong); border-radius: 5px; background: var(--card-soft); overflow: hidden; }
+  .thirdplace .tp-head { font-family: 'Antonio', sans-serif; font-size: 9px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-mute); text-align: center; padding: 5px 0 3px; font-weight: 500; }
+
+  /* STACKED (mobile) ----------------------------------------- */
+  .stack { display: none; }
+  .stack-round { margin-bottom: 22px; }
+  .stack-round h3 { font-family: 'Antonio', sans-serif; font-size: 13px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent); font-weight: 500; padding-bottom: 10px; margin-bottom: 12px; border-bottom: 1px solid var(--border); }
+  .stack-round .match { margin-bottom: 10px; }
+
+  .note { font-family: 'Inter', sans-serif; font-size: 12.5px; color: var(--text-mute); line-height: 1.55; margin-top: 26px; padding-top: 16px; border-top: 1px solid var(--border); }
+  .note b { color: var(--text-dim); font-weight: 600; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="header">
+    <div>
+      <div class="title">World Cup <span class="yr">26</span></div>
+      <div class="subtitle">Knockout Bracket · Andreas v Cal</div>
+    </div>
+    <div class="h2h-totals">
+      <div class="col andreas"><div class="name">Andreas</div><div class="score">0</div><div class="tokens">4D · 2T · 1A</div></div>
+      <div class="col cal"><div class="name">Cal</div><div class="score">0</div><div class="tokens">4D · 2T · 1A</div></div>
+    </div>
+  </div>
+
+  <div class="toolbar">
+    <div class="toolbar-left">
+      <div class="view-label" id="viewLabel"></div>
+      <div class="toggle" role="group" aria-label="whose bracket">
+        <button data-mode="A" class="active">Andreas</button>
+        <button data-mode="C">Cal</button>
+        <button data-mode="H">Compare</button>
+      </div>
+      <div class="toggle" role="group" aria-label="zoom">
+        <button data-zoom="fit" class="active">Fit</button>
+        <button data-zoom="full">100%</button>
+      </div>
+    </div>
+    <div class="legend" id="legend"></div>
+  </div>
+
+  <div class="scroll-hint" id="hint">◂ scroll horizontally to pan the bracket ▸</div>
+
+  <div class="scroll" id="scroll">
+    <div class="fitbox" id="fitbox">
+      <div class="bracket" id="bracket"></div>
+    </div>
+  </div>
+
+  <div class="stack" id="stack"></div>
+
+  <div class="note">
+    <b>Mockup · v0.1 — illustrative picks.</b>
+    Structure is the official FIFA 2026 knockout bracket (Matches 73–104). This is the <b>display &amp; compare</b>
+    surface: the matchups shown are the shared "results" frame, and each player's highlight marks who they predicted to
+    advance — <b>Andreas in teal, Cal in purple, a split bar where they agree.</b> Independent pre-tournament bracket
+    entry (each player's own propagated tree, slot sources like "3rd C/E/F/H/I") happens on the separate pick-entry
+    screen; teams here are placeholders to demonstrate the compare + confidence-token UI, not a real draw.
+  </div>
+</div>
+
+<script>
+/* ---- Team reference (illustrative) ---------------------------------- */
+const T = {
+  MEX:['Mexico','#0a7d3c'], CRO:['Croatia','#d52b1e'], ESP:['Spain','#c60b1e'], NED:['Netherlands','#ff6a00'],
+  BEL:['Belgium','#e8b948'], URU:['Uruguay','#5b9bd5'], USA:['USA','#3b5bbf'], JPN:['Japan','#1c2b6b'],
+  BRA:['Brazil','#ffdf00'], SEN:['Senegal','#00853f'], ARG:['Argentina','#75aadb'], KOR:['South Korea','#0b1f5e'],
+  GER:['Germany','#9aa0a6'], MAR:['Morocco','#c1272d'], CIV:["Côte d'Ivoire",'#ff8200'], SUI:['Switzerland','#d52b1e'],
+  FRA:['France','#1e3a8a'], DEN:['Denmark','#c60c30'], COL:['Colombia','#fcd116'], ECU:['Ecuador','#ffd100'],
+  ENG:['England','#e6e6ea'], NGA:['Nigeria','#008751'], POR:['Portugal','#0a6b34'], GHA:['Ghana','#ce1126'],
+  NOR:['Norway','#ba0c2f'], EGY:['Egypt','#c8102e'], CAN:['Canada','#d52b1e'], AUS:['Australia','#00843d'],
+  SCO:['Scotland','#0046ad'], QAT:['Qatar','#8a1538'], IRN:['Iran','#239f40'], KSA:['Saudi Arabia','#006c35']
+};
+
+/* ---- Matches: s=[home,away]; a=Andreas advancer; c=Cal advancer; tok={by,label} on the named slot ---- */
+const M = {
+  // Left R32
+  73:{s:[['RU A','MEX'],['RU B','CRO']], a:'CRO', c:'CRO'},
+  74:{s:[['W E','ESP'],['3rd A/B/C/D/F','CIV']], a:'ESP', c:'ESP'},
+  75:{s:[['W F','BEL'],['RU C','URU']], a:'BEL', c:'URU'},
+  77:{s:[['W I','NED'],['3rd C/D/F/G/H','SUI']], a:'NED', c:'NED'},
+  81:{s:[['W D','ARG'],['3rd B/E/F/I/J','KOR']], a:'ARG', c:'ARG'},
+  82:{s:[['W G','GER'],['3rd A/E/H/I/J','MAR']], a:'GER', c:'GER'},
+  83:{s:[['RU K','JPN'],['RU L','USA']], a:'USA', c:'JPN'},
+  84:{s:[['W H','BRA'],['RU J','SEN']], a:'BRA', c:'BRA', tok:{by:'a',team:'BRA',label:'Double ×2'}},
+  // Right R32
+  76:{s:[['W C','FRA'],['RU F','DEN']], a:'FRA', c:'FRA'},
+  78:{s:[['RU E','COL'],['RU I','ECU']], a:'COL', c:'ECU'},
+  79:{s:[['W A','ENG'],['3rd C/E/F/H/I','NGA']], a:'ENG', c:'ENG'},
+  80:{s:[['W L','POR'],['3rd E/H/I/J/K','GHA']], a:'POR', c:'POR'},
+  85:{s:[['W B','SCO'],['3rd E/F/G/I/J','QAT']], a:'SCO', c:'SCO'},
+  86:{s:[['W J','NOR'],['RU H','EGY']], a:'NOR', c:'EGY'},
+  87:{s:[['W K','IRN'],['3rd D/E/I/J/L','KSA']], a:'IRN', c:'IRN'},
+  88:{s:[['RU D','CAN'],['RU G','AUS']], a:'CAN', c:'CAN'},
+  // Left R16
+  89:{s:[['W74','ESP'],['W77','NED']], a:'ESP', c:'ESP'},
+  90:{s:[['W73','CRO'],['W75','BEL']], a:'BEL', c:'BEL'},
+  93:{s:[['W83','USA'],['W84','BRA']], a:'BRA', c:'USA', tok:{by:'c',team:'USA',label:'Double ×2'}},
+  94:{s:[['W81','ARG'],['W82','GER']], a:'ARG', c:'ARG'},
+  // Right R16
+  91:{s:[['W76','FRA'],['W78','COL']], a:'FRA', c:'FRA'},
+  92:{s:[['W79','ENG'],['W80','POR']], a:'ENG', c:'POR'},
+  95:{s:[['W86','NOR'],['W88','CAN']], a:'CAN', c:'CAN'},
+  96:{s:[['W85','SCO'],['W87','IRN']], a:'IRN', c:'IRN'},
+  // Left QF
+  97:{s:[['W89','ESP'],['W90','BEL']], a:'ESP', c:'ESP'},
+  98:{s:[['W93','BRA'],['W94','ARG']], a:'ARG', c:'BRA', tok:{by:'a',team:'ARG',label:'Triple ×3'}},
+  // Right QF
+  99:{s:[['W91','FRA'],['W92','ENG']], a:'FRA', c:'FRA'},
+  100:{s:[['W95','CAN'],['W96','IRN']], a:'CAN', c:'CAN'},
+  // SF
+  101:{s:[['W97','ESP'],['W98','ARG']], a:'ARG', c:'ARG', tok:{by:'c',team:'ARG',label:'Triple ×3'}},
+  102:{s:[['W99','FRA'],['W100','CAN']], a:'FRA', c:'FRA'},
+  // Final + third place
+  104:{s:[['W101','ARG'],['W102','FRA']], a:'ARG', c:'FRA', tok:{by:'a',team:'ARG',label:'All-In ×5'}},
+  103:{s:[['L101','ESP'],['L102','CAN']], a:'ESP', c:'CAN'}
+};
+
+const COLS = [
+  {side:'L', round:'r32', head:'Round of 32', ids:[74,77,73,75,83,84,81,82]},
+  {side:'L', round:'r16', head:'Round of 16', ids:[89,90,93,94]},
+  {side:'L', round:'qf',  head:'Quarter-finals', ids:[97,98]},
+  {side:'L', round:'sf',  head:'Semi-finals', ids:[101]},
+  {center:true},
+  {side:'R', round:'sf',  head:'Semi-finals', ids:[102]},
+  {side:'R', round:'qf',  head:'Quarter-finals', ids:[99,100]},
+  {side:'R', round:'r16', head:'Round of 16', ids:[91,92,95,96]},
+  {side:'R', round:'r32', head:'Round of 32', ids:[76,78,79,80,86,88,85,87]}
+];
+
+const FEED_L = {89:[74,77],90:[73,75],93:[83,84],94:[81,82],97:[89,90],98:[93,94],101:[97,98]};
+const FEED_R = {91:[76,78],92:[79,80],95:[86,88],96:[85,87],99:[91,92],100:[95,96],102:[99,100]};
+
+let MODE = 'A';     // 'A' | 'C' | 'H'
+let ZOOM = 'fit';   // 'fit' | 'full'
+
+/* ---- Rendering ------------------------------------------------------ */
+function tokenVisible(m){
+  if(!m.tok) return false;
+  if(MODE==='H') return true;
+  if(MODE==='A') return m.tok.by==='a';
+  if(MODE==='C') return m.tok.by==='c';
+}
+function chip(id, opts={}){
+  const m = M[id];
+  const showTok = tokenVisible(m);
+  const cls = ['match']; if(showTok) cls.push('tok'); if(opts.final) cls.push('final-match');
+  const rows = m.s.map(([src,code])=>{
+    let pcls = '';
+    if(MODE==='A') pcls = (code===m.a) ? 'pa' : 'dim';
+    else if(MODE==='C') pcls = (code===m.c) ? 'pc' : 'dim';
+    else { // compare
+      const isA = code===m.a, isC = code===m.c;
+      pcls = isA&&isC ? 'pboth' : isA ? 'pa' : isC ? 'pc' : 'dim';
+    }
+    const tokHere = showTok && m.tok.team===code ? ' tok-row' : '';
+    const [name,kit] = T[code];
+    return `<div class="slot ${pcls}${tokHere}">
+      <span class="kit" style="background:${kit}"></span>
+      <span class="code">${code}</span>
+      <span class="src">${src}</span>
+    </div>`;
+  }).join('');
+  const tag = showTok ? `<span class="tok-tag"><i class="ow ${m.tok.by}"></i>${m.tok.label}</span>` : '';
+  return `<div class="${cls.join(' ')}" id="m-${id}" data-mid="${id}">${tag}${rows}</div>`;
+}
+
+function championBlock(){
+  const m = M[104];
+  if(MODE==='H'){
+    return `<div class="champion">
+      <div class="trophy">♛</div>
+      <div class="lab">Predicted Champion</div>
+      <div class="champ-cmp">
+        <div class="row a"><span class="who">Andreas</span><span class="tm">${m.a}</span></div>
+        <div class="row c"><span class="who">Cal</span><span class="tm">${m.c}</span></div>
+      </div>
+    </div>`;
+  }
+  const team = MODE==='A' ? m.a : m.c;
+  const color = MODE==='A' ? 'var(--andreas)' : 'var(--cal)';
+  return `<div class="champion">
+    <div class="trophy">♛</div>
+    <div class="lab">Predicted Champion</div>
+    <div class="team" style="color:${color}">${team}</div>
+    <div class="team-name">${T[team][0]}</div>
+  </div>`;
+}
+
+function buildTree(){
+  const bracket = document.getElementById('bracket');
+  bracket.innerHTML = '<svg id="wires" preserveAspectRatio="none"></svg>';
+  COLS.forEach(c=>{
+    const col = document.createElement('div');
+    if(c.center){
+      col.className = 'col final-col';
+      col.innerHTML = `<div class="col-head">Final</div>
+        <div class="col-body">
+          ${championBlock()}
+          ${chip(104,{final:true})}
+          <div class="thirdplace"><div class="tp-head">Third place</div>${chip(103)}</div>
+        </div>`;
+    } else {
+      col.className = 'col';
+      col.innerHTML = `<div class="col-head">${c.head}</div>
+        <div class="col-body">${c.ids.map(id=>chip(id)).join('')}</div>`;
+    }
+    bracket.appendChild(col);
+  });
+}
+
+/* ---- SVG connectors ------------------------------------------------- */
+const LINE_COLOR = 'rgba(255,255,255,0.18)';
+function rect(id, cont){
+  const r = document.getElementById('m-'+id).getBoundingClientRect();
+  return {left:r.left-cont.left, right:r.right-cont.left, cy:r.top-cont.top+r.height/2};
+}
+function line(svg,x1,y1,x2,y2){
+  const ns='http://www.w3.org/2000/svg';
+  const l=document.createElementNS(ns,'line');
+  l.setAttribute('x1',x1); l.setAttribute('y1',y1); l.setAttribute('x2',x2); l.setAttribute('y2',y2);
+  l.setAttribute('stroke',LINE_COLOR); l.setAttribute('stroke-width','1.5'); l.setAttribute('shape-rendering','crispEdges');
+  svg.appendChild(l);
+}
+function elbowL(svg,child,parent,cont){ const c=rect(child,cont),p=rect(parent,cont),x=(c.right+p.left)/2; line(svg,c.right,c.cy,x,c.cy); line(svg,x,c.cy,x,p.cy); line(svg,x,p.cy,p.left,p.cy); }
+function elbowR(svg,child,parent,cont){ const c=rect(child,cont),p=rect(parent,cont),x=(p.right+c.left)/2; line(svg,c.left,c.cy,x,c.cy); line(svg,x,c.cy,x,p.cy); line(svg,x,p.cy,p.right,p.cy); }
+function drawWires(){
+  const bracket=document.getElementById('bracket'), svg=document.getElementById('wires');
+  const cont=bracket.getBoundingClientRect();
+  svg.setAttribute('viewBox',`0 0 ${bracket.offsetWidth} ${bracket.offsetHeight}`);
+  while(svg.firstChild) svg.removeChild(svg.firstChild);
+  Object.entries(FEED_L).forEach(([p,ks])=>ks.forEach(k=>elbowL(svg,k,p,cont)));
+  Object.entries(FEED_R).forEach(([p,ks])=>ks.forEach(k=>elbowR(svg,k,p,cont)));
+  const fr=rect(104,cont), l=rect(101,cont), r=rect(102,cont);
+  const lx=(l.right+fr.left)/2, rx=(fr.right+r.left)/2;
+  line(svg,l.right,l.cy,lx,l.cy); line(svg,lx,l.cy,lx,fr.cy); line(svg,lx,fr.cy,fr.left,fr.cy);
+  line(svg,r.left,r.cy,rx,r.cy); line(svg,rx,r.cy,rx,fr.cy); line(svg,rx,fr.cy,fr.right,fr.cy);
+}
+
+/* ---- Stacked (mobile) ----------------------------------------------- */
+function buildStack(){
+  const stack = document.getElementById('stack');
+  const rounds = [
+    ['Round of 32',[74,77,73,75,83,84,81,82,76,78,79,80,86,88,85,87]],
+    ['Round of 16',[89,90,93,94,91,92,95,96]],
+    ['Quarter-finals',[97,98,99,100]],
+    ['Semi-finals',[101,102]],
+    ['Final',[104]],['Third place',[103]]
+  ];
+  stack.innerHTML = rounds.map(([n,ids])=>`<div class="stack-round"><h3>${n}</h3>${ids.map(id=>chip(id)).join('')}</div>`).join('');
+}
+
+/* ---- Chrome (labels + legend) --------------------------------------- */
+function updateChrome(){
+  const vl = document.getElementById('viewLabel');
+  vl.innerHTML = MODE==='A' ? 'Showing <b>Andreas’s bracket</b>'
+              : MODE==='C' ? 'Showing <b>Cal’s bracket</b>'
+              : '<b>Head-to-head</b> — both brackets';
+  const lg = document.getElementById('legend');
+  lg.innerHTML = MODE==='H'
+    ? '<span><span class="sw a"></span>Andreas</span><span><span class="sw c"></span>Cal</span><span><span class="sw both"></span>Both agree</span><span><span class="sw tok"></span>Confidence token</span>'
+    : MODE==='A'
+      ? '<span><span class="sw a"></span>Andreas’s pick</span><span><span class="sw tok"></span>Confidence token</span>'
+      : '<span><span class="sw c"></span>Cal’s pick</span><span><span class="sw tok"></span>Confidence token</span>';
+}
+
+/* ---- Layout / zoom -------------------------------------------------- */
+function layout(){
+  const narrow = window.innerWidth < 760;
+  const scroll = document.getElementById('scroll');
+  const fitbox = document.getElementById('fitbox');
+  const bracket = document.getElementById('bracket');
+  const hint = document.getElementById('hint');
+  scroll.style.display = narrow ? 'none' : 'block';
+  document.getElementById('stack').style.display = narrow ? 'block' : 'none';
+  hint.style.display = (!narrow && ZOOM==='full') ? 'block' : 'none';
+  if(narrow) return;
+
+  // measure at natural scale, draw wires, then optionally scale to fit
+  bracket.style.transform = 'none';
+  fitbox.style.width = ''; fitbox.style.height = '';
+  drawWires();
+  const nW = bracket.offsetWidth, nH = bracket.offsetHeight;
+  if(ZOOM==='fit'){
+    const s = Math.min(1, scroll.clientWidth / nW);
+    bracket.style.transformOrigin = 'top left';
+    bracket.style.transform = `scale(${s})`;
+    fitbox.style.width = (nW*s)+'px';
+    fitbox.style.height = (nH*s)+'px';
+    scroll.style.overflowX = 'hidden';
+  } else {
+    scroll.style.overflowX = 'auto';
+  }
+}
+
+function render(){ updateChrome(); buildTree(); buildStack(); layout(); }
+
+/* ---- Wiring --------------------------------------------------------- */
+document.querySelectorAll('.toggle button[data-mode]').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('.toggle button[data-mode]').forEach(x=>x.classList.remove('active'));
+  b.classList.add('active'); MODE=b.dataset.mode; render();
+}));
+document.querySelectorAll('.toggle button[data-zoom]').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('.toggle button[data-zoom]').forEach(x=>x.classList.remove('active'));
+  b.classList.add('active'); ZOOM = b.dataset.zoom==='fit' ? 'fit' : 'full'; layout();
+}));
+window.addEventListener('resize', layout);
+if(document.fonts && document.fonts.ready){ document.fonts.ready.then(layout); }
+render();
+window.addEventListener('load', layout);
+</script>
+</body>
+</html>

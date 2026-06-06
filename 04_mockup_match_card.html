@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>World Cup 2026 — Match Card Mockup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Antonio:wght@300;400;500;600;700&family=Cormorant+Garamond:wght@400;500;600;700&family=Architects+Daughter&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0b10;
+    --card: #14161d;
+    --card-soft: #1a1d26;
+    --border: rgba(255,255,255,0.07);
+    --border-strong: rgba(255,255,255,0.14);
+    --text: #f0f0f3;
+    --text-dim: #8a8c94;
+    --text-mute: #5a5c64;
+    --accent: #ff1c5c;
+    --accent-soft: rgba(255,28,92,0.12);
+    --gold: #e8b948;
+    --gold-soft: rgba(232,185,72,0.12);
+    --andreas: #4ec9b0;
+    --cal: #c586c0;
+    --live: #ff3838;
+    --good: #5ade8c;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', -apple-system, sans-serif;
+    padding: 32px 16px;
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .container {
+    max-width: 480px;
+    margin: 0 auto;
+  }
+
+  /* HEADER --------------------------------------------------- */
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    padding: 0 4px 28px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 24px;
+  }
+  .title {
+    font-family: 'Antonio', sans-serif;
+    font-weight: 600;
+    font-size: 28px;
+    line-height: 1;
+    letter-spacing: 0.02em;
+  }
+  .title .yr {
+    color: var(--accent);
+    font-weight: 700;
+  }
+  .subtitle {
+    font-family: 'Antonio', sans-serif;
+    font-weight: 300;
+    font-size: 13px;
+    color: var(--text-dim);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin-top: 4px;
+  }
+  .h2h-totals {
+    display: flex;
+    gap: 24px;
+    font-family: 'Cormorant Garamond', serif;
+  }
+  .h2h-totals .col { text-align: right; }
+  .h2h-totals .col .name {
+    font-family: 'Antonio', sans-serif;
+    font-size: 11px;
+    letter-spacing: 0.15em;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    font-weight: 400;
+  }
+  .h2h-totals .col .score {
+    font-size: 34px;
+    line-height: 1;
+    font-weight: 500;
+    margin-top: 4px;
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: 'tnum';
+  }
+  .h2h-totals .andreas .score { color: var(--andreas); }
+  .h2h-totals .cal .score { color: var(--cal); }
+  .h2h-totals .col .tokens {
+    font-family: 'Antonio', sans-serif;
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    color: var(--gold);
+    text-transform: uppercase;
+    margin-top: 8px;
+    font-weight: 500;
+  }
+  .h2h-totals .col .streak {
+    font-family: 'Antonio', sans-serif;
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin-top: 3px;
+    font-weight: 400;
+  }
+  .h2h-totals .col .streak.hot { color: var(--good); }
+  .h2h-totals .col .streak.cold { color: var(--text-dim); }
+
+  /* MATCH CARD ----------------------------------------------- */
+  .match {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    margin-bottom: 16px;
+    overflow: hidden;
+  }
+  .match-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    font-family: 'Antonio', sans-serif;
+    font-size: 12px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    font-weight: 400;
+  }
+  .match-meta .group { color: var(--text-dim); }
+  .match-meta .stage { color: var(--accent); font-weight: 500; }
+  .match-meta .venue { color: var(--text-mute); }
+
+  /* status pill */
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: 100px;
+    font-family: 'Antonio', sans-serif;
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    font-weight: 500;
+  }
+  .pill.locked { background: var(--accent-soft); color: var(--accent); }
+  .pill.live { background: rgba(255,56,56,0.15); color: var(--live); }
+  .pill.live::before {
+    content: '';
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--live);
+    animation: pulse 1.4s ease-in-out infinite;
+  }
+  .pill.final { background: rgba(90,222,140,0.12); color: var(--good); }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.4; transform: scale(0.8); }
+  }
+
+  /* matchup line */
+  .matchup {
+    padding: 18px 16px;
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    gap: 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  .team {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .team.away { text-align: right; align-items: flex-end; }
+  .team .kitbar {
+    height: 4px;
+    width: 36px;
+    border-radius: 2px;
+  }
+  .team .code {
+    font-family: 'Antonio', sans-serif;
+    font-size: 32px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    line-height: 1;
+  }
+  .team .name {
+    font-size: 11px;
+    color: var(--text-dim);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .score-block {
+    text-align: center;
+    min-width: 90px;
+  }
+  .score-block .score {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 44px;
+    font-weight: 500;
+    line-height: 1;
+    color: var(--text);
+    letter-spacing: 0.02em;
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: 'tnum';
+  }
+  .score-block .score.pending { color: var(--text-mute); }
+  .score-block .countdown {
+    font-family: 'Antonio', sans-serif;
+    font-size: 12px;
+    color: var(--text-dim);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-top: 6px;
+  }
+  .score-block .live-min {
+    font-family: 'Antonio', sans-serif;
+    font-size: 13px;
+    color: var(--live);
+    letter-spacing: 0.1em;
+    margin-top: 4px;
+    font-weight: 500;
+  }
+
+  /* prediction grid */
+  .predictions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+  .pick {
+    padding: 16px;
+    position: relative;
+  }
+  .pick.andreas { border-right: 1px solid var(--border); }
+  .pick-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+  }
+  .pick-name {
+    font-family: 'Antonio', sans-serif;
+    font-size: 13px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    font-weight: 500;
+  }
+  .pick.andreas .pick-name { color: var(--andreas); }
+  .pick.cal .pick-name { color: var(--cal); }
+  .pick-pts {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 18px;
+    font-weight: 500;
+    color: var(--text);
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: 'tnum';
+  }
+  .pick-pts.zero { color: var(--text-mute); }
+  .pick-score {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 26px;
+    line-height: 1;
+    font-weight: 500;
+    margin-bottom: 4px;
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: 'tnum';
+  }
+  .pick-score .pred-team {
+    font-family: 'Antonio', sans-serif;
+    font-size: 13px;
+    color: var(--text-dim);
+    letter-spacing: 0.08em;
+    margin-left: 6px;
+  }
+  .pick-outcome {
+    font-size: 11px;
+    color: var(--text-mute);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+  .pick-outcome.correct { color: var(--good); }
+
+  .token {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 8px;
+    border-radius: 3px;
+    background: var(--gold-soft);
+    border: 1px solid rgba(232,185,72,0.3);
+    color: var(--gold);
+    font-family: 'Antonio', sans-serif;
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    font-weight: 500;
+    margin-bottom: 10px;
+  }
+  .token.spent { opacity: 0.4; }
+  .token-empty {
+    font-size: 11px;
+    color: var(--text-mute);
+    letter-spacing: 0.08em;
+    margin-bottom: 10px;
+    text-transform: uppercase;
+  }
+
+  .note {
+    border-top: 1px dashed var(--border);
+    padding-top: 10px;
+    font-size: 15px;
+    color: var(--text-dim);
+    line-height: 1.35;
+    font-family: 'Architects Daughter', cursive;
+    letter-spacing: 0.005em;
+  }
+  .note.sealed {
+    color: var(--text-mute);
+    font-style: normal;
+    font-family: 'Antonio', sans-serif;
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .note.sealed::before {
+    content: '◆';
+    color: var(--text-mute);
+    font-size: 8px;
+  }
+
+  /* bonus bets */
+  .bonus {
+    padding: 12px 16px;
+    background: var(--card-soft);
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .bonus-label {
+    font-family: 'Antonio', sans-serif;
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    font-weight: 500;
+  }
+  .bonus-state {
+    display: flex;
+    gap: 16px;
+    font-family: 'Antonio', sans-serif;
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .bonus-state .person {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--text-mute);
+  }
+  .bonus-state .person .dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--text-mute);
+  }
+  .bonus-state .person.in .dot { background: var(--good); }
+  .bonus-state .person.in { color: var(--text-dim); }
+
+  /* beat-cal flag */
+  .beat-cal {
+    position: absolute;
+    top: 0; right: 16px;
+    background: var(--accent);
+    color: white;
+    font-family: 'Antonio', sans-serif;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 4px 8px;
+    border-radius: 0 0 3px 3px;
+    font-weight: 500;
+  }
+
+  /* footer */
+  .footer-meta {
+    text-align: center;
+    padding-top: 24px;
+    border-top: 1px solid var(--border);
+    margin-top: 8px;
+    font-family: 'Antonio', sans-serif;
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-mute);
+  }
+  .footer-meta .heart { color: var(--accent); }
+</style>
+</head>
+<body>
+
+<div class="container">
+
+  <div class="header">
+    <div>
+      <div class="title">World Cup <span class="yr">26</span></div>
+      <div class="subtitle">Andreas v Cal</div>
+    </div>
+    <div class="h2h-totals">
+      <div class="col andreas">
+        <div class="name">Andreas</div>
+        <div class="score">347</div>
+        <div class="tokens">2D · 1T · 1A</div>
+        <div class="streak hot">▲ 4 right</div>
+      </div>
+      <div class="col cal">
+        <div class="name">Cal</div>
+        <div class="score">312</div>
+        <div class="tokens">4D · 1T · 0A</div>
+        <div class="streak cold">▼ 2 wrong</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CARD 1: Pre-kickoff ====================================== -->
+  <div class="match">
+    <div class="match-meta">
+      <span class="group">Group B · Matchday 1</span>
+      <span class="pill locked">Locked</span>
+    </div>
+    <div class="match-meta" style="border-bottom: 1px solid var(--border); padding-top: 0;">
+      <span class="venue">Tue Jun 16 · 18:00 ET · MetLife Stadium</span>
+      <span class="stage">Kicks off in 2d 14h</span>
+    </div>
+    <div class="matchup">
+      <div class="team home">
+        <div class="kitbar" style="background: #006847;"></div>
+        <div class="code">MEX</div>
+        <div class="name">Mexico</div>
+      </div>
+      <div class="score-block">
+        <div class="score pending">— : —</div>
+        <div class="countdown">Awaiting kickoff</div>
+      </div>
+      <div class="team away">
+        <div class="kitbar" style="background: #b22234;"></div>
+        <div class="code">USA</div>
+        <div class="name">United States</div>
+      </div>
+    </div>
+    <div class="predictions">
+      <div class="pick andreas">
+        <div class="pick-head">
+          <span class="pick-name">Andreas</span>
+        </div>
+        <div class="pick-score">2 – 1 <span class="pred-team">MEX</span></div>
+        <div class="pick-outcome">Mexico to win</div>
+        <div class="token">◆ Double</div>
+        <div class="note sealed">Pundit note sealed</div>
+      </div>
+      <div class="pick cal">
+        <div class="pick-head">
+          <span class="pick-name">Cal</span>
+        </div>
+        <div class="pick-score">1 – 1 <span class="pred-team">DRAW</span></div>
+        <div class="pick-outcome">Draw</div>
+        <div class="token-empty">No token</div>
+        <div class="note sealed">Pundit note sealed</div>
+      </div>
+    </div>
+    <div class="bonus">
+      <span class="bonus-label">Bonus bets — revealed at kickoff</span>
+      <div class="bonus-state">
+        <span class="person"><span class="dot"></span>Andreas</span>
+        <span class="person"><span class="dot"></span>Cal</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- CARD 2: Live ============================================= -->
+  <div class="match">
+    <div class="match-meta">
+      <span class="group">Group G · Matchday 2</span>
+      <span class="pill live">Live</span>
+    </div>
+    <div class="match-meta" style="border-bottom: 1px solid var(--border); padding-top: 0;">
+      <span class="venue">SoFi Stadium · 21:00 ET</span>
+      <span class="stage">In progress</span>
+    </div>
+    <div class="matchup">
+      <div class="team home">
+        <div class="kitbar" style="background: #75aadb;"></div>
+        <div class="code">ARG</div>
+        <div class="name">Argentina</div>
+      </div>
+      <div class="score-block">
+        <div class="score">1 : 1</div>
+        <div class="live-min">67'</div>
+      </div>
+      <div class="team away">
+        <div class="kitbar" style="background: #c8102e;"></div>
+        <div class="code">CRO</div>
+        <div class="name">Croatia</div>
+      </div>
+    </div>
+    <div class="predictions">
+      <div class="pick andreas">
+        <div class="pick-head">
+          <span class="pick-name">Andreas</span>
+        </div>
+        <div class="pick-score">2 – 0 <span class="pred-team">ARG</span></div>
+        <div class="pick-outcome">Argentina to win</div>
+        <div class="token">◆◆◆ Triple</div>
+        <div class="note sealed">Pundit note sealed until full time</div>
+      </div>
+      <div class="pick cal">
+        <div class="pick-head">
+          <span class="pick-name">Cal</span>
+        </div>
+        <div class="pick-score">3 – 1 <span class="pred-team">ARG</span></div>
+        <div class="pick-outcome">Argentina to win</div>
+        <div class="token-empty">No token</div>
+        <div class="note sealed">Pundit note sealed until full time</div>
+      </div>
+    </div>
+    <div class="bonus">
+      <span class="bonus-label">Bonus bets — revealed</span>
+      <div class="bonus-state">
+        <span class="person in"><span class="dot"></span>Andreas · BTTS yes</span>
+        <span class="person in"><span class="dot"></span>Cal · Over 2.5</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- CARD 3: Final ============================================ -->
+  <div class="match">
+    <div class="match-meta">
+      <span class="group">Group H · Matchday 1</span>
+      <span class="pill final">Final</span>
+    </div>
+    <div class="match-meta" style="border-bottom: 1px solid var(--border); padding-top: 0;">
+      <span class="venue">Estadio Azteca · 12:00 ET</span>
+      <span class="stage">After 90 min</span>
+    </div>
+    <div class="matchup">
+      <div class="team home">
+        <div class="kitbar" style="background: #000000; border: 1px solid #333;"></div>
+        <div class="code">GER</div>
+        <div class="name">Germany</div>
+      </div>
+      <div class="score-block">
+        <div class="score">3 : 1</div>
+        <div class="countdown">Full time</div>
+      </div>
+      <div class="team away">
+        <div class="kitbar" style="background: #bc002d;"></div>
+        <div class="code">JPN</div>
+        <div class="name">Japan</div>
+      </div>
+    </div>
+    <div class="predictions">
+      <div class="pick andreas">
+        <div class="beat-cal">Beat Cal +3</div>
+        <div class="pick-head">
+          <span class="pick-name">Andreas</span>
+          <span class="pick-pts">+13</span>
+        </div>
+        <div class="pick-score">3 – 1 <span class="pred-team">GER</span></div>
+        <div class="pick-outcome correct">Outcome &amp; exact ✓</div>
+        <div class="token spent">◆ Double — used</div>
+        <div class="note">"Germany's finally got their act together — Japan's press dies after 60."</div>
+      </div>
+      <div class="pick cal">
+        <div class="pick-head">
+          <span class="pick-name">Cal</span>
+          <span class="pick-pts zero">0</span>
+        </div>
+        <div class="pick-score">2 – 1 <span class="pred-team">JPN</span></div>
+        <div class="pick-outcome">Wrong outcome</div>
+        <div class="token-empty">No token</div>
+        <div class="note">"Japan keeps surprising people. I'll take the upset, thanks."</div>
+      </div>
+    </div>
+    <div class="bonus">
+      <span class="bonus-label">Bonus bets — resolved</span>
+      <div class="bonus-state">
+        <span class="person in"><span class="dot"></span>Andreas · Over 2.5 ✓ +10</span>
+        <span class="person"><span class="dot"></span>Cal · No bet</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer-meta">
+    Mockup · v0.1 <span class="heart">◆</span> 3 of ~64 match cards
+  </div>
+
+</div>
+
+</body>
+</html>
