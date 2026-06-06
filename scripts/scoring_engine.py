@@ -161,6 +161,14 @@ def apply_token(base_pts, token):
 def norm(s):
     return (s or "").strip().casefold()
 
+def rv_winners(rv):
+    """SideGames.resolved_value may name joint winners separated by '|'
+    (written by resolve_sidegames.py on ties). -> set of normalized answers."""
+    return {norm(x) for x in str(rv or "").split("|") if norm(x)}
+
+def side_game_hit(guess, rv):
+    return norm(guess) in rv_winners(rv) if guess is not None else False
+
 # ---- credentials + Airtable client -----------------------------------------
 def load_keys():
     keys = {k: os.environ.get(k) for k in ("AIRTABLE_PAT", "AIRTABLE_BASE_ID")}
@@ -341,11 +349,11 @@ def main():
                 elif f.get("predicted_team"):
                     t = rec2team.get(f["predicted_team"][0], {})
                     guess = t.get("name")
-                    if norm(t.get("code")) == norm(rv):
+                    if norm(t.get("code")) in rv_winners(rv):
                         guess = t.get("code")
                 elif f.get("predicted_text"):
                     guess = f.get("predicted_text")
-                if guess is not None and norm(guess) == norm(rv):
+                if side_game_hit(guess, rv):   # joint winners ("A | B") both pay
                     bp = basep
 
         base_pts[rec] = bp

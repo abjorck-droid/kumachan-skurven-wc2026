@@ -32,55 +32,83 @@ this session added the **public read-only live board** (was priority 1).
 3. **Pick-entry fixes**: Champion label corrected **100 → 150 pts** (was stale vs the locked v1.0
    spec), and the lock hint now links to `/live.html`.
 
+4. **Side-game auto-resolution** (was priority 2, also done this session).
+   **`scripts/resolve_sidegames.py`** — Airtable-only (no API-Football key; reads the
+   `events_json` the poller already stores). Resolves, with conservative timing rules:
+   - **First Red Card / First Own Goal** — earliest qualifying event, final only once its match
+     is Finished AND every match kicking off at/before it is Finished (VAR-safe, handles
+     simultaneous kickoffs; straight red or second yellow both count as "red").
+   - **Top Scorer Group A–L** — once all 6 of a group's fixtures are Finished. Own goals and
+     missed penalties excluded.
+   - **Golden Boot** — once the Final is Finished. Goals, tie-break assists (from goal events),
+     still tied → joint. **Total Tournament Goals** — once every fixture is Finished; extra-time
+     goals count, shootout kicks don't.
+   - **Write-once**: never overwrites an existing `resolved_value` (protects manual entries);
+     `--force` to recompute. `--dry-run` / `--verbose` as usual. Player names canonicalized via
+     the `Footballers` table so they string-match what the pick dropdowns saved.
+   - **Engine patch**: joint winners are written `"Name | Name"`; `scoring_engine.py` got
+     `rv_winners()`/`side_game_hit()` so each side of the pipe pays. Scalar path untouched.
+   - **Workflow**: `scoreboard-poll` is now poll → **resolve** → score, every 15 min.
+
+5. **Pool decisions locked (2026-06-06):** scorer ties resolve **FIFA-style for Golden Boot**
+   (goals → assists → joint) and **joint for per-group top scorers**; **Golden Glove stays
+   manual** (needs lineups, partly judged — Andreas types it at tournament end). **Dark Horse**
+   needs no `resolved_value` (engine computes its ladder directly).
+
 ### Verification (sandbox has no network — see environment note in prior handoff)
 - Function syntax-checked as an ES module.
 - `/api/public` integration-tested against a **stubbed Airtable** through the real router:
   19 checks — token/PAT leak audit, unlocked-player hiding, sealed/revealed notes, shapes.
 - `live.html` pure functions unit-tested (24 checks) and all five tabs render-tested under a
   stub DOM with the demo payload (40 checks). All green.
+- `resolve_sidegames.py` + engine patch: 47 checks — event parsing/classification, the
+  first-event finality rule (live/VAR/simultaneous-kickoff cases), group-complete gating,
+  tally exclusions, FIFA tie-break, end-to-end `compute_resolutions` pre/post-Final, and the
+  engine's joint-winner matching. All green.
 
 ---
 
-## ⚠ Blocked: git commit (stale lock)
+## ⚠ Sandbox + git: don't mix
 
-`.git/index.lock` (0 bytes, created ~23:01 June 6) exists and the Cowork sandbox **cannot delete
-it** ("Operation not permitted" across the mount). Nothing is committed from this session yet.
+Any git **write** from the Cowork sandbox (`add`/`commit`) leaves a stale `.git/index.lock` it
+cannot delete ("Operation not permitted" on unlink across the mount). It bit us twice today.
+**Rule going forward: Claude never runs git writes; Andreas commits/pushes via GitHub Desktop.**
 
-**Andreas — on your Mac:**
+State as of end of session: the **public-view batch is already committed & pushed** by Andreas
+(`81043e4 "Public view update"`). The **side-game batch is staged but NOT committed**, and a
+fresh stale lock exists. **Andreas — on your Mac:**
 ```
 rm ~/Desktop/WorldCup2026/.git/index.lock
 ```
-then commit & push (GitHub Desktop is fine). The working tree holds, ready to go:
-- `functions/api/[[route]].js` (modified — /api/public)
-- `site/live.html` (new), `site/index.html` (modified — 150 pts + link)
-- `03_Scoring_spec_v1.0.md` + `WC2026_Scoring_Spec_v1.0.pdf` (new), `03_Scoring_spec_v0.1.md` (deleted)
-- `scripts/scoring_engine.py` (comment fix), `00_handoff_2026-06-06.md` + this file
-
-Pages auto-deploys on push; the board goes live at
-**`https://kumachan-skurven-wc2026.pages.dev/live.html`** — shareable, no token needed.
+then commit & push (GitHub Desktop). In the batch:
+- `scripts/resolve_sidegames.py` (new)
+- `scripts/scoring_engine.py` (joint-winner support: `rv_winners`/`side_game_hit`)
+- `.github/workflows/scoreboard-poll.yml` (poll → resolve → score)
+- this handoff (updated)
 
 ---
 
 ## Outstanding — Andreas's actions
 
-1. **Clear the git lock, commit, push** (above).
+1. **Clear the git lock again, commit, push** (above).
 2. **Send Cal his link** (`…/?p={cal-token}` from `PoolPlayers`) if not already done.
 3. **Both: enter and LOCK picks before 2026-06-11.**
-4. After push: open `…/live.html` once to sanity-check the real (pre-lock) state — expect the
-   "picks appear as players lock" notice and empty standings. Optionally also `…/live.html?demo=1`.
-5. *(Optional, from last session)* delete the stray "S" option on `Teams.group` in Airtable.
+4. Sanity-check `…/live.html` against the real base (expect the "picks appear as players lock"
+   notice pre-lock); `…/live.html?demo=1` shows it fully populated.
+5. *(Optional, carried)* delete the stray "S" option on `Teams.group` in Airtable.
 
 ---
 
 ## Next-session priorities
 
-1. **Side-game auto-resolution** (now top of the list) — fill `SideGames.resolved_value`
-   automatically: Golden Boot via `/players/topscorers`, first red/own goal via `events_json` scan,
-   per-group top scorers, running total-goals. Scoring engine already consumes `resolved_value`.
-2. **Knockouts (~June 26)** — re-run `load_fixtures.py` for knockout fixtures; fill
-   `ROUND_TIER_OVERRIDES` in `scoring_engine.py` with exact round strings; consider upgrading the
-   Brackets tab to the real tree (mockup `05_mockup_bracket.html` is the blueprint, and
-   `/api/public` already carries everything it needs).
+1. **Knockouts (~June 26, after the draw)** — re-run `load_fixtures.py` for knockout fixtures;
+   fill `ROUND_TIER_OVERRIDES` in `scoring_engine.py` with the exact knockout round strings
+   (doc-01's last open item — also feeds `resolve_sidegames.py`, which imports `round_tier`);
+   consider upgrading the live board's Brackets tab to the real tree (mockup
+   `05_mockup_bracket.html` is the blueprint; `/api/public` already carries everything needed).
+2. **First-poll-day watch (June 11)** — eyeball the first real `scoreboard-poll` runs: poller →
+   resolver → engine all writing, live board updating. The resolver prints "pending" rows with
+   `--verbose` if you want a local check: `python3 scripts/resolve_sidegames.py --dry-run --verbose`.
 3. *(Optional)* bonus-bet entry, knockout match-outcome picks, custom subdomain, Cloudflare Access.
 
 ## Open questions (carried)
@@ -91,5 +119,6 @@ Pages auto-deploys on push; the board goes live at
 
 ## What I'd do first next session
 
-Confirm the push landed and `…/live.html` renders against the real base, then start
-**side-game auto-resolution** (priority 1).
+Nothing is buildable before the knockout draw that isn't optional — so: confirm the side-game
+batch pushed, watch the June-11 first polls, and pick from the optional list (bonus bets being
+the most game-relevant) or rest until the draw.
