@@ -45,6 +45,12 @@
 
   .row{display:grid;grid-template-columns:120px 1fr 122px;gap:10px;align-items:center;background:var(--card);border:1px solid var(--border);border-radius:6px;padding:10px 12px;margin-bottom:8px}
   .row.tokened{border-color:rgba(232,185,72,.4)}
+  .row.mrow{grid-template-columns:170px 1fr 110px}
+  .mctl{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .mctl select{width:auto;min-width:118px}
+  .scorebox{display:inline-flex;align-items:center;gap:5px}
+  .scorebox input{width:46px;text-align:center;padding:6px 4px}
+  .scorebox b{color:var(--text-mute);font-weight:600}
   .row .lab{font-family:'Antonio',sans-serif;font-size:13px;letter-spacing:.05em;color:var(--text-dim);text-transform:uppercase}
   .row .note{grid-column:2 / 4;margin-top:2px}
   select,input{width:100%;background:var(--card-soft);border:1px solid var(--border-strong);border-radius:5px;color:var(--text);font-family:'Inter',sans-serif;font-size:14px;padding:8px 10px;outline:none}
@@ -158,6 +164,26 @@ function playerRow(key,label,filter,ph){
     return row(key,label,`<select data-key="${key}" data-role="player">${playerOptions(v,filter)}</select>`); }
   return textRow(key,label,ph);   // graceful fallback before the squad import runs
 }
+function matchRow(m){
+  const key="match|"+m.fixture_id;
+  META[key]={type:"match_outcome", match_id:m.fixture_id};
+  const v=VALUES[key]||{};
+  const hn=m.home_code||m.home_name||"Home", an=m.away_code||m.away_name||"Away";
+  const full=(m.home_name||hn)+" v "+(m.away_name||an);
+  const oc=v.outcome||"";
+  const opt=(val,lab)=>`<option value="${val}" ${oc===val?'selected':''}>${lab}</option>`;
+  const sel=`<select data-key="${key}" data-role="outcome"><option value="">— pick —</option>`+
+    opt("Home",hn+" win")+opt("Draw","Draw")+opt("Away",an+" win")+`</select>`;
+  const sh=(v.score_home==null?"":v.score_home), sa=(v.score_away==null?"":v.score_away);
+  const sc=`<span class="scorebox"><input type="number" min="0" data-key="${key}" data-role="score_home" value="${sh}" placeholder="–"><b>:</b><input type="number" min="0" data-key="${key}" data-role="score_away" value="${sa}" placeholder="–"></span>`;
+  const tokened=v.token?' tokened':'';
+  return `<div class="row mrow${tokened}" id="row-${key}">
+    <span class="lab">${full}</span>
+    <div class="mctl">${sel}${sc}</div>
+    ${tokenSelect(key)}
+    ${noteInput(key)}
+  </div>`;
+}
 function numRow(key,label){ const v=(VALUES[key]||{}).scalar; const vv=(v===undefined||v===null)?"":v;
   return row(key,label,`<input type="number" min="0" data-key="${key}" data-role="scalar" placeholder="e.g. 145" value="${vv}">`); }
 
@@ -170,6 +196,12 @@ function render(){
     h += `<div class="grp-label">${g.title} <span style="color:var(--text-mute)">· ${g.pts}</span></div>`;
     g.slots.forEach(([key,label])=>{ META[key]={type:"bracket_slot",bracket_slot:key}; h += teamRow(key,label); });
   });
+  // Group matches (only if load_fixtures.py has populated them)
+  if(DATA.matches && DATA.matches.length){
+    h += `<h2>Group matches <span class="pts">· 5 pts outcome · +10 exact</span></h2><div class="sub">Call every group match. The scoreline is optional — add it only where you want the +10 exact-score bonus.</div>`;
+    let g=null;
+    DATA.matches.forEach(m=>{ if(m.group!==g){ g=m.group; h+=`<div class="grp-label">Group ${g||'?'}</div>`; } h+=matchRow(m); });
+  }
   // Side games
   const sgSub = hasFootballers()
     ? "Season-long calls, locked at kickoff. Player picks are real squad dropdowns."
@@ -208,7 +240,7 @@ function updateReserves(){
   }).join('');
 }
 function updateSummary(){
-  const total=Object.values(VALUES).filter(v=>v.team_id||v.player_id||v.player_text||v.scalar!==undefined&&v.scalar!==""||v.token).length;
+  const total=Object.values(VALUES).filter(v=>v.team_id||v.player_id||v.player_text||v.outcome||v.scalar!==undefined&&v.scalar!==""||v.token).length;
   const used=countTokens();
   const el=$("#summary"); if(!el) return;
   el.innerHTML = `<span>Picks made <b>${total}</b></span>
@@ -222,6 +254,9 @@ function onChange(e){
   if(role==="team"){ VALUES[key].team_id = e.target.value || undefined; }
   else if(role==="player"){ VALUES[key].player_id = e.target.value || undefined; }
   else if(role==="text"){ VALUES[key].player_text = e.target.value || undefined; }
+  else if(role==="outcome"){ VALUES[key].outcome = e.target.value || undefined; }
+  else if(role==="score_home"){ VALUES[key].score_home = e.target.value===""?undefined:Number(e.target.value); }
+  else if(role==="score_away"){ VALUES[key].score_away = e.target.value===""?undefined:Number(e.target.value); }
   else if(role==="scalar"){ VALUES[key].scalar = e.target.value===""?undefined:Number(e.target.value); }
   else if(role==="note"){ VALUES[key].note = e.target.value || undefined; }
   else if(role==="token"){
@@ -245,14 +280,18 @@ function flash(msg){ const s=$("#status"); s.textContent="⚠ "+msg; s.style.col
 function collectPicks(){
   return Object.keys(META).map(key=>{
     const v=VALUES[key]||{}; const m=META[key];
-    const has = v.team_id||v.player_id||v.player_text||(v.scalar!==undefined&&v.scalar!=="")||v.token||v.note;
+    const has = v.team_id||v.player_id||v.player_text||v.outcome||(v.score_home!=null&&v.score_home!=="")||(v.scalar!==undefined&&v.scalar!=="")||v.token||v.note;
     if(!has) return null;
     const p={key, type:m.type};
     if(m.bracket_slot) p.bracket_slot=m.bracket_slot;
     if(m.side_game) p.side_game=m.side_game;
+    if(m.match_id!=null) p.match_id=m.match_id;
     if(v.team_id) p.team_id=v.team_id;
     if(v.player_id) p.player_id=v.player_id;
     if(v.player_text) p.player_text=v.player_text;
+    if(v.outcome) p.outcome=v.outcome;
+    if(v.score_home!=null&&v.score_home!=="") p.score_home=v.score_home;
+    if(v.score_away!=null&&v.score_away!=="") p.score_away=v.score_away;
     if(v.scalar!==undefined&&v.scalar!=="") p.scalar=v.scalar;
     if(v.token) p.token=v.token;
     if(v.note) p.pundit_note=v.note;
@@ -301,13 +340,15 @@ async function loadPlayer(player){
     (DATA.existing||[]).forEach(p=>{ VALUES[p.key]={
       team_id:p.team_id!=null?String(p.team_id):undefined,
       player_id:p.player_id!=null?String(p.player_id):undefined, player_text:p.player_text||undefined,
+      outcome:p.outcome||undefined,
+      score_home:(p.score_home!=null?p.score_home:undefined), score_away:(p.score_away!=null?p.score_away:undefined),
       scalar:(p.scalar!=null?p.scalar:undefined), token:p.token||undefined, note:p.note||undefined }; });
     render();
   }catch(err){ $("#app").innerHTML=""; showErr("Couldn't load — is the base built & server running? ("+err.message+")"); }
 }
 
 $("#app").addEventListener("change", onChange);
-$("#app").addEventListener("input", e=>{ if(["text","note","scalar"].includes(e.target.dataset.role)) onChange(e); });
+$("#app").addEventListener("input", e=>{ if(["text","note","scalar","score_home","score_away"].includes(e.target.dataset.role)) onChange(e); });
 document.addEventListener("click", e=>{
   if(e.target.id==="saveBtn") save();
   if(e.target.id==="lockBtn") lockBracket();

@@ -81,9 +81,10 @@ def at_upsert(table, records, merge_on):
     return n
 
 # ---- pure transform (unit-tested) ------------------------------------------
-def prediction_fields(player, pick, team_map, player_rec, sidegame_map, footballer_map=None):
+def prediction_fields(player, pick, team_map, player_rec, sidegame_map, footballer_map=None, match_map=None):
     """Build one Predictions record's fields from a client pick dict."""
     footballer_map = footballer_map or {}
+    match_map = match_map or {}
     rec = {"label": f"{player}|{pick['key']}", "pool_player": [player_rec],
            "prediction_type": pick["type"]}
     if pick.get("bracket_slot"):
@@ -92,6 +93,15 @@ def prediction_fields(player, pick, team_map, player_rec, sidegame_map, football
         rec["side_game"] = [sidegame_map[pick["side_game"]]]
     if pick.get("team_id") is not None and int(pick["team_id"]) in team_map:
         rec["predicted_team"] = [team_map[int(pick["team_id"])]]
+    # group-match picks: outcome (Home/Draw/Away) + optional exact score, linked to the match
+    if pick.get("match_id") is not None and int(pick["match_id"]) in match_map:
+        rec["match"] = [match_map[int(pick["match_id"])]]
+    if pick.get("outcome"):
+        rec["predicted_outcome"] = pick["outcome"]
+    if pick.get("score_home") is not None and pick["score_home"] != "":
+        rec["predicted_score_home"] = pick["score_home"]
+    if pick.get("score_away") is not None and pick["score_away"] != "":
+        rec["predicted_score_away"] = pick["score_away"]
     # player picks: prefer a real Footballers link; fall back to free text if squads
     # aren't imported yet (or the chosen id isn't in the table).
     pid = pick.get("player_id")
@@ -125,7 +135,8 @@ def get_player(name):
 def bootstrap(player):
     team_recs = at_list("Teams", fields=["team_id", "code", "name", "group"])
     rec2tid = {r["id"]: r["fields"].get("team_id") for r in team_recs}
-    team_by_rec = {r["id"]: {"code": r["fields"].get("code"), "group": r["fields"].get("group")}
+    team_by_rec = {r["id"]: {"code": r["fields"].get("code"), "group": r["fields"].get("group"),
+                             "name": r["fields"].get("name"), "team_id": r["fields"].get("team_id")}
                    for r in team_recs}
     teams = [{"id": r["fields"].get("team_id"), "code": r["fields"].get("code"),
               "name": r["fields"].get("name"), "group": r["fields"].get("group")}
@@ -151,6 +162,29 @@ def bootstrap(player):
         footballers.sort(key=lambda x: ((x.get("group") or "Z"), (x.get("team_code") or ""), (x.get("name") or "")))
     except Exception:
         footballers, rec2pid = [], {}
+    # Group-stage fixtures (empty until load_fixtures.py runs). Group stage only — knockout
+    # pairings don't exist at kickoff, so they can't be picked yet.
+    matches, mrec2fid = [], {}
+    try:
+        for r in at_list("Matches", fields=["fixture_id", "label", "round", "home_team", "away_team", "kickoff_utc"]):
+            f = r.get("fields", {})
+            fid = f.get("fixture_id")
+            rnd = f.get("round") or ""
+            if fid is None or not str(rnd).lower().startswith("group"):
+                continue
+            mrec2fid[r["id"]] = fid
+            h = f.get("home_team") or []
+            a = f.get("away_team") or []
+            hi = team_by_rec.get(h[0]) if h else {}
+            ai = team_by_rec.get(a[0]) if a else {}
+            matches.append({"fixture_id": fid, "round": rnd, "kickoff": f.get("kickoff_utc"),
+                            "group": (hi or {}).get("group") or (ai or {}).get("group"),
+                            "home_id": (hi or {}).get("team_id"), "home_code": (hi or {}).get("code"),
+                            "home_name": (hi or {}).get("name"), "away_id": (ai or {}).get("team_id"),
+                            "away_code": (ai or {}).get("code"), "away_name": (ai or {}).get("name")})
+        matches.sort(key=lambda m: ((m.get("group") or "Z"), (m.get("kickoff") or "")))
+    except Exception:
+        matches, mrec2fid = [], {}
     prow = get_player(player)
     pf = (prow or {}).get("fields", {})
     existing = []
@@ -166,11 +200,13 @@ def bootstrap(player):
                              "team_id": rec2tid.get(link[0]) if link else None,
                              "player_id": rec2pid.get(plink[0]) if plink else None,
                              "player_text": f.get("predicted_text"), "scalar": f.get("predicted_scalar"),
+                             "outcome": f.get("predicted_outcome"),
+                             "score_home": f.get("predicted_score_home"), "score_away": f.get("predicted_score_away"),
                              "token": f.get("confidence_token"), "note": f.get("pundit_note")})
             if f.get("locked_at"):
                 locked = True
     return {"player": player, "players": ["Andreas", "Cal"], "teams": teams, "sideGames": side,
-            "footballers": footballers,
+            "footballers": footballers, "matches": matches,
             "tokensStart": START_TOKENS, "locked": locked, "existing": existing,
             "tokensRemaining": {"Double": pf.get("tokens_remaining_double", 4),
                                 "Triple": pf.get("tokens_remaining_triple", 2),
@@ -186,7 +222,9 @@ def save(player, picks):
     sg_map = {r["fields"].get("name"): r["id"] for r in at_list("SideGames", fields=["name"])}
     foot_map = {int(r["fields"]["player_id"]): r["id"]
                 for r in at_list("Footballers", fields=["player_id"]) if r["fields"].get("player_id") is not None}
-    records = [prediction_fields(player, p, team_map, player_rec, sg_map, foot_map) for p in picks if p.get("key")]
+    match_map = {int(r["fields"]["fixture_id"]): r["id"]
+                 for r in at_list("Matches", fields=["fixture_id"]) if r["fields"].get("fixture_id") is not None}
+    records = [prediction_fields(player, p, team_map, player_rec, sg_map, foot_map, match_map) for p in picks if p.get("key")]
     n = at_upsert("Predictions", records, ["label"]) if records else 0
     used = token_counts(picks)
     at("PATCH", f"{BASE}/PoolPlayers", {"records": [{"id": player_rec, "fields": {

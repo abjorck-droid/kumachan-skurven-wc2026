@@ -83,7 +83,7 @@ These are predicted *before* the tournament begins — naming the team you think
 | Each Quarter-finalist correctly named (8 slots) | **10 points each** (max 80) |
 | Each Semi-finalist correctly named (4 slots) | **20 points each** (max 80) |
 | Each Finalist correctly named (2 slots) | **40 points each** (max 80) |
-| Champion correctly named | **100 points** |
+| Champion correctly named | **150 points** |
 
 These stack with per-match outcome picks — they're independent. (Predicting a team into the QF + predicting the QF match outcome correctly = two separate scores.)
 
@@ -239,7 +239,7 @@ These are decided-no-for-now, with rationale:
 
 ## Open scoring questions before code
 
-1. **Champion bonus.** Is 100 points right? Feels right given the bracket-slot ladder (R16: 5, QF: 10, SF: 20, Final: 40, Champion: 100) follows roughly 2× per round.
+1. **Champion bonus.** RESOLVED 2026-06-06 → **150** (was 100). Andreas + Cal wanted the champion to feel like THE big bracket call and offset a pile of smaller misses. 150 keeps it ~1.9 full bracket tiers and, critically, keeps an All-In champion (5×150 = 750) below the Dark Horse's signature 1000 ceiling, preserving the risk/reward hierarchy. 200 was the considered cap (would tie the All-In Dark Horse) but rejected for flattening that distinction.
 2. **Beat-Cal bonus value.** I picked +3 to keep it from dominating. Sanity check: across 64 matches, max 192 H2H bonus = roughly the same magnitude as guessing 4 quarter-final winners correctly. Feels balanced.
-3. **All-In on a 5-point pick = 25 points.** Is that worth the token? Probably not — implies you should save All-In for high-base-value picks like the Champion (5× 100 = 500) or Dark Horse pick on a deep run.
+3. **All-In on a 5-point pick = 25 points.** Is that worth the token? Probably not — implies you should save All-In for high-base-value picks like the Champion (5× 150 = 750) or Dark Horse pick on a deep run.
 4. **Total tournament goals.** "Closest without going over" punishes over-estimation. Alternative is "closest in either direction." Closest-without-going-over is more interesting because it forces you to commit to a lower bound. Keep as proposed unless you push back.

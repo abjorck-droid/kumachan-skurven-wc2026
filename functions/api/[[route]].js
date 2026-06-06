@@ -65,7 +65,8 @@ async function atUpsert(env, table, records, mergeOn) {
 }
 
 // ---- pure transform (mirrors pickentry_server.prediction_fields) -----------
-function predictionFields(playerName, pick, teamMap, playerRec, sgMap, footMap) {
+function predictionFields(playerName, pick, teamMap, playerRec, sgMap, footMap, matchMap) {
+  matchMap = matchMap || {};
   const rec = { label: `${playerName}|${pick.key}`, pool_player: [playerRec], prediction_type: pick.type };
   if (pick.bracket_slot) rec.bracket_slot = pick.bracket_slot;
   if (pick.side_game && sgMap[pick.side_game]) rec.side_game = [sgMap[pick.side_game]];
@@ -77,6 +78,11 @@ function predictionFields(playerName, pick, teamMap, playerRec, sgMap, footMap) 
   } else if (pick.player_text) {
     rec.predicted_text = pick.player_text;
   }
+  // group-match picks: outcome (Home/Draw/Away) + optional exact score, linked to the match
+  if (pick.match_id != null && matchMap[parseInt(pick.match_id)]) rec.match = [matchMap[parseInt(pick.match_id)]];
+  if (pick.outcome) rec.predicted_outcome = pick.outcome;
+  if (pick.score_home != null && pick.score_home !== "") rec.predicted_score_home = pick.score_home;
+  if (pick.score_away != null && pick.score_away !== "") rec.predicted_score_away = pick.score_away;
   if (pick.scalar != null && pick.scalar !== "") rec.predicted_scalar = pick.scalar;
   if (pick.token) rec.confidence_token = pick.token;
   if (pick.pundit_note) rec.pundit_note = pick.pundit_note;
@@ -97,7 +103,7 @@ async function bootstrap(env, prow) {
   const rec2tid = {}, teamByRec = {};
   for (const r of teamRecs) {
     rec2tid[r.id] = r.fields.team_id;
-    teamByRec[r.id] = { code: r.fields.code, group: r.fields.group };
+    teamByRec[r.id] = { code: r.fields.code, group: r.fields.group, name: r.fields.name, team_id: r.fields.team_id };
   }
   const teams = teamRecs
     .filter((r) => r.fields.team_id != null)
@@ -125,6 +131,26 @@ async function bootstrap(env, prow) {
       (a.name || "").localeCompare(b.name || ""));
   } catch (e) { footballers = []; rec2pid = {}; }
 
+  // Group-stage fixtures (empty until load_fixtures.py runs). Group stage only.
+  let matches = [];
+  try {
+    for (const r of await atList(env, "Matches", ["fixture_id", "label", "round", "home_team", "away_team", "kickoff_utc"])) {
+      const f = r.fields || {};
+      const fid = f.fixture_id;
+      const rnd = f.round || "";
+      if (fid == null || !String(rnd).toLowerCase().startsWith("group")) continue;
+      const h = f.home_team || [], a = f.away_team || [];
+      const hi = h.length ? (teamByRec[h[0]] || {}) : {};
+      const ai = a.length ? (teamByRec[a[0]] || {}) : {};
+      matches.push({ fixture_id: fid, round: rnd, kickoff: f.kickoff_utc,
+        group: hi.group || ai.group,
+        home_id: hi.team_id, home_code: hi.code, home_name: hi.name,
+        away_id: ai.team_id, away_code: ai.code, away_name: ai.name });
+    }
+    matches.sort((a, b) =>
+      (a.group || "Z").localeCompare(b.group || "Z") || (a.kickoff || "").localeCompare(b.kickoff || ""));
+  } catch (e) { matches = []; }
+
   const pf = prow.fields || {};
   const existing = [];
   let locked = false;
@@ -140,6 +166,8 @@ async function bootstrap(env, prow) {
         team_id: link.length ? rec2tid[link[0]] : null,
         player_id: plink.length ? rec2pid[plink[0]] : null,
         player_text: f.predicted_text, scalar: f.predicted_scalar,
+        outcome: f.predicted_outcome,
+        score_home: f.predicted_score_home, score_away: f.predicted_score_away,
         token: f.confidence_token, note: f.pundit_note,
       });
       if (f.locked_at) locked = true;
@@ -147,7 +175,7 @@ async function bootstrap(env, prow) {
   }
 
   return {
-    player: playerName, players: [playerName], teams, sideGames: side, footballers,
+    player: playerName, players: [playerName], teams, sideGames: side, footballers, matches,
     tokensStart: START_TOKENS, locked, existing,
     tokensRemaining: {
       Double: pf.tokens_remaining_double ?? 4,
@@ -168,10 +196,13 @@ async function save(env, prow, picks) {
   const footMap = {};
   for (const r of await atList(env, "Footballers", ["player_id"]))
     if (r.fields.player_id != null) footMap[parseInt(r.fields.player_id)] = r.id;
+  const matchMap = {};
+  for (const r of await atList(env, "Matches", ["fixture_id"]))
+    if (r.fields.fixture_id != null) matchMap[parseInt(r.fields.fixture_id)] = r.id;
 
   const records = (picks || [])
     .filter((p) => p && p.key)
-    .map((p) => predictionFields(playerName, p, teamMap, playerRec, sgMap, footMap));
+    .map((p) => predictionFields(playerName, p, teamMap, playerRec, sgMap, footMap, matchMap));
   const n = records.length ? await atUpsert(env, "Predictions", records, ["label"]) : 0;
 
   const used = { Double: 0, Triple: 0, AllIn: 0 };
