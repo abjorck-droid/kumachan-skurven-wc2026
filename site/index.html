@@ -51,6 +51,15 @@
   .scorebox{display:inline-flex;align-items:center;gap:5px}
   .scorebox input{width:46px;text-align:center;padding:6px 4px}
   .scorebox b{color:var(--text-mute);font-weight:600}
+
+  /* tab bar (second row of the sticky header) */
+  .tabs{max-width:760px;margin:0 auto;padding:0 18px;display:flex;gap:2px;border-top:1px solid var(--border);overflow-x:auto}
+  .tabs button{background:transparent;border:none;border-bottom:2px solid transparent;cursor:pointer;font-family:'Antonio',sans-serif;font-size:13px;letter-spacing:.07em;text-transform:uppercase;color:var(--text-dim);padding:11px 13px;font-weight:500;white-space:nowrap}
+  .tabs button:hover{color:var(--text)}
+  .tabs button.on{color:var(--text);border-bottom-color:var(--accent)}
+  .tabs .tc{color:var(--gold);font-size:11px}
+  .tabpanel{display:none}
+  .tabpanel.active{display:block}
   .row .lab{font-family:'Antonio',sans-serif;font-size:13px;letter-spacing:.05em;color:var(--text-dim);text-transform:uppercase}
   .row .note{grid-column:2 / 4;margin-top:2px}
   select,input{width:100%;background:var(--card-soft);border:1px solid var(--border-strong);border-radius:5px;color:var(--text);font-family:'Inter',sans-serif;font-size:14px;padding:8px 10px;outline:none}
@@ -81,6 +90,12 @@
   <div class="reserves" id="reserves"></div>
   <button class="btn save" id="saveBtn">Save</button>
   <span class="status" id="status"></span>
+</div>
+<div class="tabs" id="tabs" style="display:none">
+  <button data-tab="matches" class="on">Group matches<span class="tc" id="tc-matches"></span></button>
+  <button data-tab="ko">Knockouts<span class="tc" id="tc-ko"></span></button>
+  <button data-tab="side">Side bets<span class="tc" id="tc-side"></span></button>
+  <button data-tab="review">Review &amp; Lock</button>
 </div></div>
 
 <div class="wrap">
@@ -107,7 +122,7 @@ const SIDE_PLAYER = [
 ];
 const GROUPS = "ABCDEFGHIJKL".split("");
 
-let DATA = null, META = {}, VALUES = {}, PLAYER = "Andreas", LOCKED = false;
+let DATA = null, META = {}, VALUES = {}, PLAYER = "Andreas", LOCKED = false, ACTIVE_TAB = "matches";
 // Hosted mode: a magic-link token in the URL (?p=…) means the player is fixed by their link.
 // No token = local-server mode with the Andreas/Cal toggle. Same page serves both.
 const TOKEN = new URLSearchParams(location.search).get("p");
@@ -189,45 +204,75 @@ function numRow(key,label){ const v=(VALUES[key]||{}).scalar; const vv=(v===unde
 
 function render(){
   META = {};
-  let h = "";
-  // Bracket
-  h += `<h2>Bracket slots</h2><div class="sub">Name the teams you think reach each round — independent of who they actually play. Stacks with match picks.</div>`;
+  // --- Knockouts panel: bracket-slot ladder + Dark Horse ---
+  let ko = `<h2>Bracket ladder</h2><div class="sub">Name the teams you think reach each knockout round — independent of who they actually play. Stacks with your group-match picks.</div>`;
   BRACKET.forEach(g=>{
-    h += `<div class="grp-label">${g.title} <span style="color:var(--text-mute)">· ${g.pts}</span></div>`;
-    g.slots.forEach(([key,label])=>{ META[key]={type:"bracket_slot",bracket_slot:key}; h += teamRow(key,label); });
+    ko += `<div class="grp-label">${g.title} <span style="color:var(--text-mute)">· ${g.pts}</span></div>`;
+    g.slots.forEach(([key,label])=>{ META[key]={type:"bracket_slot",bracket_slot:key}; ko += teamRow(key,label); });
   });
-  // Group matches (only if load_fixtures.py has populated them)
+  ko += `<h2>Dark Horse <span class="pts">· ladder up to 1000 pts</span></h2><div class="sub">One team, ranked outside the FIFA top 16 at lock. The spiciest pick in the game — an All-In here is the boldest move available.</div>`;
+  META["darkhorse"]={type:"dark_horse",side_game:"Dark Horse"};
+  ko += teamRow("darkhorse","Dark Horse");
+
+  // --- Group matches panel ---
+  let mk = "";
   if(DATA.matches && DATA.matches.length){
-    h += `<h2>Group matches <span class="pts">· 5 pts outcome · +10 exact</span></h2><div class="sub">Call every group match. The scoreline is optional — add it only where you want the +10 exact-score bonus.</div>`;
+    mk += `<h2>Group matches <span class="pts">· 5 pts outcome · +10 exact</span></h2><div class="sub">Call every group match. The scoreline is optional — add it only where you want the +10 exact-score bonus.</div>`;
     let g=null;
-    DATA.matches.forEach(m=>{ if(m.group!==g){ g=m.group; h+=`<div class="grp-label">Group ${g||'?'}</div>`; } h+=matchRow(m); });
+    DATA.matches.forEach(m=>{ if(m.group!==g){ g=m.group; mk+=`<div class="grp-label">Group ${g||'?'}</div>`; } mk+=matchRow(m); });
+  } else {
+    mk += `<h2>Group matches</h2><div class="sub">No fixtures loaded yet — run <code>load_fixtures.py</code>.</div>`;
   }
-  // Side games
+
+  // --- Side bets panel ---
   const sgSub = hasFootballers()
     ? "Season-long calls, locked at kickoff. Player picks are real squad dropdowns."
     : "Season-long calls, locked at kickoff. Player names are free text until the squad import runs.";
-  h += `<h2>Side games</h2><div class="sub">${sgSub}</div>`;
+  let sb = `<h2>Side bets</h2><div class="sub">${sgSub}</div>`;
   SIDE_PLAYER.forEach(([name,pts,filter,ph])=>{ const key="side|"+name; META[key]={type:"side_game",side_game:name};
-    h += playerRow(key, `${name} · ${pts}`, filter, ph); });
+    sb += playerRow(key, `${name} · ${pts}`, filter, ph); });
   { const key="side|Total Tournament Goals"; META[key]={type:"side_game",side_game:"Total Tournament Goals"};
-    h += numRow(key,"Total Goals · 30"); }
-  h += `<div class="grp-label">Per-group top scorer · 15 pts each</div>`;
+    sb += numRow(key,"Total Goals · 30"); }
+  sb += `<div class="grp-label">Per-group top scorer · 15 pts each</div>`;
   GROUPS.forEach(g=>{ const name="Top Scorer Group "+g, key="side|"+name; META[key]={type:"side_game",side_game:name};
-    h += playerRow(key, "Group "+g, g, "Top scorer"); });
-  // Dark horse
-  h += `<h2>Dark Horse <span class="pts">· ladder up to 1000 pts</span></h2><div class="sub">One team, ranked outside the FIFA top 16 at lock. The spiciest pick in the game — an All-In here is the boldest move available.</div>`;
-  META["darkhorse"]={type:"dark_horse",side_game:"Dark Horse"};
-  h += teamRow("darkhorse","Dark Horse");
-  // Review / lock
-  h += `<div class="lockbar">
+    sb += playerRow(key, "Group "+g, g, "Top scorer"); });
+
+  // --- Review & lock panel ---
+  let rv = `<div class="lockbar">
     <h2 style="margin-top:0">Review &amp; lock</h2>
     <div class="summary" id="summary"></div>
-    <button class="btn lock" id="lockBtn">Lock my bracket</button>
-    <div class="hint">Locking stamps every pick immutable and reveals them to your opponent (except pundit notes). You can keep editing &amp; saving until you lock.</div>
+    <button class="btn lock" id="lockBtn">Lock my picks</button>
+    <div class="hint">Locking stamps every pick immutable and reveals them to your opponent (except pundit notes). You can keep editing &amp; saving across all tabs until you lock.</div>
   </div>`;
-  $("#app").innerHTML = h;
+
+  $("#app").innerHTML =
+    `<div class="tabpanel" data-tab="matches">${mk}</div>`+
+    `<div class="tabpanel" data-tab="ko">${ko}</div>`+
+    `<div class="tabpanel" data-tab="side">${sb}</div>`+
+    `<div class="tabpanel" data-tab="review">${rv}</div>`;
+  $("#tabs").style.display="flex";
+  setTab(ACTIVE_TAB);
   updateReserves(); updateSummary();
   if(LOCKED) setLockedUI();
+}
+
+function setTab(name){
+  ACTIVE_TAB = name;
+  document.querySelectorAll(".tabpanel").forEach(p=>p.classList.toggle("active", p.dataset.tab===name));
+  document.querySelectorAll("#tabs button").forEach(b=>b.classList.toggle("on", b.dataset.tab===name));
+}
+function hasVal(v){ return !!(v && (v.team_id||v.player_id||v.player_text||v.outcome||(v.score_home!=null&&v.score_home!=="")||(v.scalar!==undefined&&v.scalar!=="")||v.token||v.note)); }
+function tabOf(key){
+  if(key.startsWith("match|")) return "matches";
+  if(key==="darkhorse"||(META[key]&&META[key].type==="bracket_slot")) return "ko";
+  if(key.startsWith("side|")) return "side";
+  return null;
+}
+function updateTabCounts(){
+  const c={matches:0,ko:0,side:0};
+  Object.keys(META).forEach(k=>{ const t=tabOf(k); if(t && hasVal(VALUES[k])) c[t]++; });
+  const set=(id,n)=>{ const e=$(id); if(e) e.textContent = n?(" "+n):""; };
+  set("#tc-matches",c.matches); set("#tc-ko",c.ko); set("#tc-side",c.side);
 }
 
 function countTokens(){ const c={Double:0,Triple:0,AllIn:0};
@@ -240,6 +285,7 @@ function updateReserves(){
   }).join('');
 }
 function updateSummary(){
+  updateTabCounts();
   const total=Object.values(VALUES).filter(v=>v.team_id||v.player_id||v.player_text||v.outcome||v.scalar!==undefined&&v.scalar!==""||v.token).length;
   const used=countTokens();
   const el=$("#summary"); if(!el) return;
@@ -329,6 +375,7 @@ function showErr(m){ const b=$("#errBanner"); b.textContent="⚠ "+m; b.style.di
 async function loadPlayer(player){
   PLAYER=player||PLAYER; LOCKED=false; VALUES={};
   $("#lockBanner").style.display="none";
+  $("#tabs").style.display="none";
   $("#app").innerHTML='<div class="loading">Loading picks…</div>';
   try{
     const url = TOKEN ? api("/api/bootstrap") : ("/api/bootstrap?player="+encodeURIComponent(player));
@@ -352,6 +399,8 @@ $("#app").addEventListener("input", e=>{ if(["text","note","scalar","score_home"
 document.addEventListener("click", e=>{
   if(e.target.id==="saveBtn") save();
   if(e.target.id==="lockBtn") lockBracket();
+  const tb=e.target.closest && e.target.closest("#tabs button");
+  if(tb){ setTab(tb.dataset.tab); }
   if(e.target.dataset.player){
     document.querySelectorAll("#playerSeg button").forEach(b=>b.classList.remove("on"));
     e.target.classList.add("on"); loadPlayer(e.target.dataset.player);
