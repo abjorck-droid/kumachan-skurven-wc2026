@@ -15,7 +15,7 @@ Re-runnable (upsert), so running it again later just refreshes kickoff times / v
 round labels and fills in knockout fixtures once their pairings publish. Stdlib only;
 reuses the poller's tested transforms (to_match_fields, build_team_map, Airtable client).
 """
-import argparse, os, re, sys, datetime as dt
+import argparse, os, sys, datetime as dt
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import poller as P
 
@@ -52,19 +52,21 @@ def main():
     print("—" * 40)
     print(f"· upserted {n} Matches{' (dry)' if args.dry_run else ''}")
 
-    # Backfill Teams.group from the group-stage round strings (the Teams seed had no group,
-    # which left the per-group top-scorer dropdowns empty). Derive team -> group letter.
+    # Backfill Teams.group. The fixtures' round is "Group Stage - N" (no group letter),
+    # so the letter comes from /standings, where each row carries group="Group A".
     team_group = {}
-    for fx in fixtures:
-        rnd = (fx.get("league") or {}).get("round") or ""
-        m = re.search(r"group\s+([A-Za-z])", rnd, re.I)
-        if not m:
-            continue
-        g = m.group(1).upper()
-        for side in ("home", "away"):
-            tid = ((fx.get("teams") or {}).get(side) or {}).get("id")
-            if tid is not None:
-                team_group[tid] = g
+    sbody, srem = P.api_get("standings", key, league=P.LEAGUE, season=P.SEASON)
+    sresp = sbody.get("response", [])
+    sgroups = (sresp[0]["league"]["standings"] if sresp else [])
+    for table in sgroups:
+        for row in table:
+            gname = (row.get("group") or "").strip()
+            if gname.lower().startswith("group"):
+                gname = gname[5:].strip()        # "Group A" -> "A"
+            letter = gname[:1].upper() if gname else ""
+            tid = (row.get("team") or {}).get("id")
+            if letter and letter in "ABCDEFGHIJKL" and tid is not None:
+                team_group[tid] = letter
     if team_group:
         group_records = [{"team_id": tid, "group": g} for tid, g in team_group.items()]
         gn = P.at_upsert(base, "Teams", pat, group_records, ["team_id"], dry=args.dry_run)
@@ -72,9 +74,10 @@ def main():
         print(f"· backfilled group on {gn} teams{' (dry)' if args.dry_run else ''} "
               f"({len(groups_seen)} groups: {', '.join(groups_seen)})")
     else:
-        print("· no group rounds found to backfill team groups")
+        print("· ⚠ /standings returned no groups yet — groups not backfilled; re-run closer to kickoff")
+    remaining = srem or remaining
 
-    print(f"· done. api calls: 1, rate-limit remaining: {remaining}")
+    print(f"· done. api calls: 2 (fixtures + standings), rate-limit remaining: {remaining}")
 
 
 if __name__ == "__main__":
