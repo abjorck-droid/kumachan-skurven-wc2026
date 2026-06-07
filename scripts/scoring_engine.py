@@ -163,6 +163,15 @@ def apply_token(base_pts, token):
         return base_pts * TOKEN_MULT[token]
     return base_pts
 
+def first_claim(seen, key):
+    """Pool rule (erratum 2026-06-06): within a bracket round, each team counts at most
+    once per player. First claim (rows processed in label order, so deterministic) scores;
+    duplicates are void. Returns True on first claim, False on a duplicate."""
+    if key in seen:
+        return False
+    seen.add(key)
+    return True
+
 def norm(s):
     return (s or "").strip().casefold()
 
@@ -291,6 +300,7 @@ def main():
     pool = at_list(base, "PoolPlayers", pat, fields=["name"])
     rec2player = {r["id"]: r["fields"].get("name") for r in pool}
     preds = at_list(base, "Predictions", pat)
+    preds.sort(key=lambda r: r.get("fields", {}).get("label", ""))   # deterministic dedupe order
     mulls = at_list(base, "Mulligans", pat, fields=["original_prediction", "new_prediction"])
     mull_affected = set()
     for m in mulls:
@@ -339,6 +349,7 @@ def main():
     total_goals_rows = {}    # player -> pred rec  (where to write the result)
     total_goals_sg = None    # the SideGames fields for Total Tournament Goals
     bonus_rows = []          # (pred rec, fields, player, match_rec) — scored after the loop
+    bracket_seen = set()     # (player, tier, team_id) — duplicate slots in a round are void
 
     for r in preds:
         f = r["fields"]
@@ -365,6 +376,9 @@ def main():
             btier = bracket_tier(f.get("bracket_slot"))
             tid = next((rec2team[x]["team_id"] for x in (f.get("predicted_team") or []) if x in rec2team), None)
             if btier and tid is not None:
+                if not first_claim(bracket_seen, (player, btier, tid)):
+                    base_pts[rec] = 0; resolved[rec] = True   # duplicate team in round — void
+                    continue
                 if team_reached(tid, btier, teams_in_match_tier, champion_id):
                     bp, res = BRACKET_PTS[btier], True
                 elif tier_complete(btier, teams_in_match_tier, final_done):

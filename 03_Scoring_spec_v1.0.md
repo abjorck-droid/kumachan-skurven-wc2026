@@ -6,6 +6,11 @@ This is the source-of-truth doc the front-end, the scoring engine, and the UI co
 
 **Changelog**
 
+- **v1.0 erratum (2026-06-06, late)** — Clarification, agreed by both players: within a single
+  bracket round, **each team counts at most once per player**. Duplicate slot picks of the same
+  team in one round are void (0 points; the lowest-numbered slot is the one that counts). The
+  pick-entry UI now blocks duplicates outright; the scoring engine voids any that slip through.
+  Closes the "16 slots of France" expected-value exploit — no other scoring values change.
 - **v1.0 (2026-06-06)** — Locked. One value changed from the draft: **Champion bonus 100 → 150**. Every other point value and mechanic confirmed as drafted. Lock semantics corrected: knockout per-match picks cannot lock at tournament kickoff (pairings don't exist until the group stage ends) — they lock per-match, if/when that entry flow is built. Editorial pass same day: player-specific phrasing neutralized so the doc reads identically for both players (the "Beat-Cal bonus" is now the **Beat-Rival bonus**); no rule changes.
 - v0.1 (2026-05-19) — first draft.
 

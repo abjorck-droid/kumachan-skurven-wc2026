@@ -169,9 +169,49 @@ then commit & push everything (GitHub Desktop). In the batch:
 6. **At draw time (~June 26):** after `load_fixtures.py` pulls the knockout fixtures, fill
    `site/bracket_map_2026.json` (`fixture_to_match`: fixture_id → FIFA match number 73–104) and
    push — the tree places fixtures by kickoff-order fallback until then.
-7. *(Optional, carried)* delete the stray "S" option on `Teams.group` in Airtable.
+7. **Run the team-metadata backfill on the Mac** (fills kit colors for the kit bars, flags,
+   and FIFA rankings for Dark Horse eligibility):
+   ```
+   python3 scripts/backfill_team_meta.py --dry-run   # inspect
+   python3 scripts/backfill_team_meta.py
+   ```
+   Data lives in `data/team_meta_2026.json` — rankings are the **April 2026 FIFA edition**
+   (top 16 of our 48 = FRA ESP ARG ENG POR BRA NED MAR BEL GER CRO SEN COL MEX USA →
+   **33 teams are legal Dark Horses**). ⚠ The **June 10 edition** lands the day before
+   kickoff — if you'd rather pin eligibility to that, update the file and re-run (idempotent).
+8. *(Optional, carried)* delete the stray "S" option on `Teams.group` in Airtable.
 
 ---
+
+## Late additions (same session)
+
+**Team metadata backfill** — `data/team_meta_2026.json` (48 teams: kit hex, flag emoji,
+April-2026 FIFA ranks) + `scripts/backfill_team_meta.py` (idempotent, `--dry-run`). A one-time
+scheduled task (`refresh-fifa-rankings-june10`) refreshes ranks when the June-10 edition
+publishes and flags any top-16 / Dark Horse eligibility flips (April boundary: USA 16 in,
+URU 17 out).
+
+**Bracket guardrails (pool rule erratum, agreed by Andreas)** — within a bracket round each
+team counts at most once per player; duplicates are void (closed a real EV exploit: nothing
+previously stopped "16 slots of France", and the engine paid each row). Implemented: engine
+voids duplicates deterministically (label-sorted, first slot wins), pick-entry hard-blocks
+duplicate selection with a flash, and the Review tab gained a non-blocking **coherence box**
+(>3-per-group in R16; champion/finalist/SF/QF teams missing from lower tiers). Spec changelog
+carries the erratum. **Tell Cal about the dedupe rule.**
+
+**Designed but not built: propagated-bracket entry** (Andreas wants this possibly within days).
+Key insight making it low-risk: the locked spec scores order-free SETS per round, and a
+propagated tree is just another way to GENERATE those sets — pick group finishes (top-2 in
+order + which 8 thirds advance), resolve the R32 grid, click advancers to a champion; store
+the resulting sets in the existing `bracket_slot` rows. Scoring/engine/schema/lock semantics
+untouched; free-form and tree-entered brackets can coexist and score identically. FIFA's
+third-place allocation table (495 combos) is only COSMETIC here — a documented deterministic
+assignment rule suffices, since sets, not match positions, are what score. Persist the extra
+structure as ~13 unscored rows (e.g. `group_order|A` → "MEX,KOR,RSA" in predicted_text +
+`thirds_advance`); per-match advancers are then derivable from the sets. Scope ≈ one focused
+session (the bonus-bet build is the right size comparison); biggest pieces are the group-order
+pickers, the interactive tree with upstream-change invalidation cascade, and token attachment
+on the generated slots.
 
 ## Next-session priorities
 

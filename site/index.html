@@ -68,6 +68,10 @@
   select[data-role=token]{font-family:'Antonio',sans-serif;font-size:12px;letter-spacing:.06em;text-transform:uppercase}
   .row.tokened select[data-role=token]{color:var(--gold);border-color:rgba(232,185,72,.5)}
 
+  .warnbox{margin:20px 0 0;padding:14px 16px;border:1px solid rgba(232,185,72,.4);border-radius:8px;background:var(--gold-soft)}
+  .warnbox b{font-family:'Antonio',sans-serif;font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--gold)}
+  .warnbox ul{margin:8px 0 0 18px;font-size:13px;color:var(--text-dim);line-height:1.6}
+  .okline{margin:20px 0 0;font-family:'Antonio',sans-serif;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--good)}
   .lockbar{margin:36px 0 10px;padding:18px;border:1px solid var(--border-strong);border-radius:8px;background:var(--card)}
   .lockbar .summary{display:flex;gap:22px;flex-wrap:wrap;font-family:'Antonio',sans-serif;font-size:13px;letter-spacing:.06em;color:var(--text-dim);text-transform:uppercase;margin-bottom:14px}
   .lockbar .summary b{color:var(--text);font-size:18px;font-family:'Cormorant Garamond',serif}
@@ -122,6 +126,40 @@ const BONUS_TYPES = [
 function matchStarted(m){
   if(m.status && m.status!=="Scheduled") return true;
   return !!(m.kickoff && new Date(m.kickoff) <= new Date());
+}
+// bracket round of a slot key — used for the duplicate guard + coherence warnings
+function tierOfKey(key){
+  if(key==="Champion") return "Champion";
+  if(key.indexOf("F-")===0) return "Finalist";
+  if(key.indexOf("SF-")===0) return "SF";
+  if(key.indexOf("QF-")===0) return "QF";
+  if(key.indexOf("R16-")===0) return "R16";
+  return null;
+}
+var TIER_LABEL={Champion:"Champion",Finalist:"Finalists",SF:"Semi-finalists",QF:"Quarter-finalists",R16:"Round of 16"};
+function bracketWarnings(){
+  // non-blocking coherence checks (pool rule: duplicates are hard-blocked separately)
+  var tiers={R16:[],QF:[],SF:[],Finalist:[],Champion:[]};
+  Object.keys(META).forEach(function(k){
+    if(META[k].type!=="bracket_slot") return;
+    var t=tierOfKey(k), v=(VALUES[k]||{}).team_id;
+    if(t&&v) tiers[t].push(String(v));
+  });
+  var teamOf=function(id){ return (DATA.teams||[]).filter(function(x){return String(x.id)===String(id);})[0]||{}; };
+  var warn=[];
+  var byGroup={};
+  tiers.R16.forEach(function(id){ var g=teamOf(id).group; if(g) byGroup[g]=(byGroup[g]||0)+1; });
+  Object.keys(byGroup).forEach(function(g){
+    if(byGroup[g]>3) warn.push("Group "+g+": "+byGroup[g]+" teams in your Round of 16 — only 3 can survive a group");
+  });
+  [["Champion","Finalist"],["Finalist","SF"],["SF","QF"],["QF","R16"]].forEach(function(pair){
+    tiers[pair[0]].forEach(function(id){
+      if(tiers[pair[1]].indexOf(id)<0)
+        warn.push((teamOf(id).code||teamOf(id).name||"A team")+" is in your "+TIER_LABEL[pair[0]]+
+          " but not your "+TIER_LABEL[pair[1]]+" — that leaves points on the table");
+    });
+  });
+  return warn;
 }
 
 const BRACKET = [
@@ -325,7 +363,7 @@ function render(){
     sb += playerRow(key, "Group "+g, g, "Top scorer"); });
 
   // --- Review & lock panel ---
-  let rv = `<div class="lockbar">
+  let rv = `<div id="coherence"></div><div class="lockbar">
     <h2 style="margin-top:0">Review &amp; lock</h2>
     <div class="summary" id="summary"></div>
     <button class="btn lock" id="lockBtn">Lock my picks</button>
@@ -381,12 +419,36 @@ function updateSummary(){
   el.innerHTML = `<span>Picks made <b>${total}</b></span>
     <span>Tokens placed <b>${used.Double+used.Triple+used.AllIn}/7</b></span>
     <span>Double <b>${used.Double}/4</b></span><span>Triple <b>${used.Triple}/2</b></span><span>All-In <b>${used.AllIn}/1</b></span>`;
+  const cw=$("#coherence");
+  if(cw){
+    const w=bracketWarnings();
+    cw.innerHTML = w.length
+      ? `<div class="warnbox"><b>⚠ Bracket coherence — ${w.length} thing${w.length===1?"":"s"} to look at (won't block locking)</b><ul>`+
+        w.map(x=>`<li>${x}</li>`).join("")+`</ul></div>`
+      : `<div class="okline">Bracket coherence ✓ no issues</div>`;
+  }
 }
 
 function onChange(e){
   const key=e.target.dataset.key, role=e.target.dataset.role; if(!key||LOCKED) return;
   VALUES[key] = VALUES[key] || {};
-  if(role==="team"){ VALUES[key].team_id = e.target.value || undefined; }
+  if(role==="team"){
+    var newTeam = e.target.value || undefined;
+    var myTier = META[key] && META[key].type==="bracket_slot" ? tierOfKey(key) : null;
+    if(newTeam && myTier){
+      // pool rule: a team can hold at most one slot per round (duplicates are void anyway)
+      var dupe = Object.keys(META).some(function(k){
+        return k!==key && META[k].type==="bracket_slot" && tierOfKey(k)===myTier &&
+               String((VALUES[k]||{}).team_id||"")===String(newTeam);
+      });
+      if(dupe){
+        e.target.value = VALUES[key].team_id || "";
+        flash("Already picked in "+(TIER_LABEL[myTier]||myTier)+" — one slot per team per round");
+        return;
+      }
+    }
+    VALUES[key].team_id = newTeam;
+  }
   else if(role==="player"){ VALUES[key].player_id = e.target.value || undefined; }
   else if(role==="text"){ VALUES[key].player_text = e.target.value || undefined; }
   else if(role==="outcome"){ VALUES[key].outcome = e.target.value || undefined; }
