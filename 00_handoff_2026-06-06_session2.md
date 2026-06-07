@@ -81,6 +81,27 @@ this session added the **public read-only live board** (was priority 1).
    - **`pickentry_server.py`** — full parity port (savebonus, all-fixtures bootstrap, shared
      token recount), so local mode keeps matching hosted.
 
+7. **Both mockups are now live** (Andreas's call, same session):
+   - **Match cards (mockup 04 → live).** The live board's Scoreboard and Group-matches tabs now
+     render full match cards: status pill (Open/Locked/Live/Final), venue + kickoff + countdown
+     ("Kicks off in 2d 14h"), kit-bar matchup with big score, **live minute** (new
+     `Matches.elapsed`, see actions below), two-column prediction cells (predicted score +
+     advancer, outcome verdict, token chip with spent state, **pundit notes** — revealed in the
+     handwritten font, or shown as "sealed" via a new `has_note` boolean that never leaks
+     content), **Beat-rival flag**, and the bonus strip (opt-in dots pre-kickoff → revealed bets
+     with ✓/✗/+pts → void styling). Header gained **streak chips** (▲ N right / ▼ N wrong).
+   - **Bracket tree (mockup 05 → live).** The Brackets tab now has a **Tree / Ladders toggle**.
+     The tree renders the official FIFA 2026 template (matches 73–104, source labels like
+     "RU A" / "3rd A/B/C/D/F"), SVG wires, Fit/100% zoom, mobile stacked view, and
+     **{P1}/{P2}/Compare** modes. Chips fill from knockout fixtures via
+     **`site/bracket_map_2026.json`** (fixture_id → FIFA match number; kickoff-order fallback
+     until it's filled at draw time). Highlights come from **ladder-set membership** (a team
+     lights up in a round if the player picked it to reach the next round), tokens ride the
+     deciding chip, finished matches check the winner. Ladders remain the pre-draw default;
+     tree auto-defaults once knockout fixtures exist.
+   - **Poller** writes `Matches.elapsed` in a separate tolerant upsert — if the field doesn't
+     exist yet it prints a warning and the score write is untouched.
+
 ### Verification (sandbox has no network — see environment note in prior handoff)
 - Function syntax-checked as an ES module.
 - `/api/public` integration-tested against a **stubbed Airtable** through the real router:
@@ -96,6 +117,11 @@ this session added the **public read-only live board** (was priority 1).
   token budget, public reveal sealing); engine `bonus_actuals`/`score_bonus` (22 checks);
   pick-entry render + collect logic under a stub DOM (15 checks); live board re-render suite
   incl. void state (45 checks). Earlier suites re-run green after every change.
+- Match cards + bracket tree: pure functions (streaks, round labels, knockout round mapping,
+  bracket-map fallback, ladder sets — 16 checks) and a full stub-DOM render pass over every tab
+  incl. the built tree (66 checks: card chrome, live minute, sealed notes, beat flag, template
+  sources, mapped fixtures, winner checks, token tags, highlight classes). Whole suite (7 test
+  files) re-run green at the end.
 
 ---
 
@@ -115,9 +141,11 @@ then commit & push everything (GitHub Desktop). In the batch:
 - `scripts/resolve_sidegames.py` (new) and `.github/workflows/scoreboard-poll.yml`
   (poll → resolve → score)
 - `scripts/scoring_engine.py` (joint winners + full bonus-bet scoring)
-- `functions/api/[[route]].js` (`/api/savebonus`, all-fixtures bootstrap, public sealing)
-- `site/index.html` (Bonus bets tab) and `site/live.html` (bonus display)
-- `scripts/pickentry_server.py` (parity port)
+- `functions/api/[[route]].js` (`/api/savebonus`, all-fixtures bootstrap, public sealing,
+  `elapsed` + `has_note`)
+- `site/index.html` (Bonus bets tab), `site/live.html` (bonus display + match cards + bracket
+  tree), `site/bracket_map_2026.json` (new, empty until the draw)
+- `scripts/pickentry_server.py` (parity port), `scripts/poller.py` (live minute)
 - this handoff (updated)
 
 ---
@@ -125,11 +153,17 @@ then commit & push everything (GitHub Desktop). In the batch:
 ## Outstanding — Andreas's actions
 
 1. **Clear the git lock again, commit, push** (above).
-2. **Send Cal his link** (`…/?p={cal-token}` from `PoolPlayers`) if not already done.
-3. **Both: enter and LOCK picks before 2026-06-11.**
-4. Sanity-check `…/live.html` against the real base (expect the "picks appear as players lock"
-   notice pre-lock); `…/live.html?demo=1` shows it fully populated.
-5. *(Optional, carried)* delete the stray "S" option on `Teams.group` in Airtable.
+2. **Add a Number field named `elapsed` to the `Matches` table** in the Airtable UI (one click;
+   needed for live minutes on match cards — the poller warns but keeps working without it).
+3. **Send Cal his link** (`…/?p={cal-token}` from `PoolPlayers`) if not already done.
+4. **Both: enter and LOCK picks before 2026-06-11.**
+5. Sanity-check `…/live.html` against the real base (expect the "picks appear as players lock"
+   notice pre-lock); `…/live.html?demo=1` shows everything populated — cards, bonus strips,
+   streaks, and the bracket tree with a mapped semi-final.
+6. **At draw time (~June 26):** after `load_fixtures.py` pulls the knockout fixtures, fill
+   `site/bracket_map_2026.json` (`fixture_to_match`: fixture_id → FIFA match number 73–104) and
+   push — the tree places fixtures by kickoff-order fallback until then.
+7. *(Optional, carried)* delete the stray "S" option on `Teams.group` in Airtable.
 
 ---
 

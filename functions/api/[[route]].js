@@ -370,7 +370,7 @@ async function publicView(env) {
       "tokens_remaining_double", "tokens_remaining_triple", "tokens_remaining_allin", "mulligans_remaining"]),
     atList(env, "Teams", ["team_id", "code", "name", "group", "fifa_ranking", "kit_color_primary"]),
     atList(env, "Matches", ["fixture_id", "round", "kickoff_utc", "venue", "home_team", "away_team",
-      "home_score", "away_score", "status", "winner", "winner_method"]),
+      "home_score", "away_score", "status", "winner", "winner_method", "elapsed"]),
     atList(env, "SideGames", ["name", "base_points", "resolution_type", "resolved_value", "dark_horse_ladder"]),
   ]);
 
@@ -410,6 +410,7 @@ async function publicView(env) {
       home_id: hi.team_id, home_code: hi.code, home_name: hi.name,
       away_id: ai.team_id, away_code: ai.code, away_name: ai.name,
       home_score: f.home_score ?? null, away_score: f.away_score ?? null,
+      elapsed: f.elapsed ?? null,
       winner_id: w ? (teamByRec[w] || {}).team_id : null, winner_method: f.winner_method || null,
     });
   }
@@ -490,6 +491,7 @@ async function publicView(env) {
       points: f.points_awarded ?? null,
       rival_bonus: f.beat_rival_bonus ?? null,
       resolved: !!f.resolved,
+      has_note: !!f.pundit_note,                               // existence only — content stays sealed
     };
     if (f.resolved && f.pundit_note) p.note = f.pundit_note;   // notes stay sealed until resolution
     picks[owner].push(p);

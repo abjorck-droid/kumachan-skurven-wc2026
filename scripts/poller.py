@@ -232,6 +232,24 @@ def run_scoreboard(keys, target_date, dry, force):
     touched = at_upsert(base, "Matches", pat, records, ["fixture_id"], dry=dry) if records else 0
     print(f"· upserted {touched} Matches{' (dry)' if dry else ''}")
 
+    # Live minute → Matches.elapsed, as a SEPARATE tolerant upsert so a missing field
+    # (must be added in the Airtable UI: Number field named "elapsed") can never break
+    # the main score write.
+    el_records = [{"fixture_id": fx["fixture"]["id"],
+                   "elapsed": (fx["fixture"].get("status") or {}).get("elapsed")}
+                  for fx in fixtures
+                  if (fx["fixture"].get("status") or {}).get("elapsed") is not None]
+    if el_records:
+        try:
+            at_upsert(base, "Matches", pat, el_records, ["fixture_id"], dry=dry)
+            print(f"· live minute written for {len(el_records)} fixture(s)")
+        except RuntimeError as e:
+            if "UNKNOWN_FIELD" in str(e).upper() or "elapsed" in str(e):
+                print("  ⚠ Matches.elapsed missing — add a Number field named 'elapsed' in "
+                      "Airtable to get live minutes on match cards (scores unaffected)")
+            else:
+                errors.append(str(e))
+
     # which fixtures already have events stored, so we don't refetch finished ones
     have_events = set()
     if not dry:

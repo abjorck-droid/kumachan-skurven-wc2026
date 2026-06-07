@@ -1,0 +1,4 @@
+{
+  "_readme": "Maps Airtable/API-Football fixture_id -> official FIFA 2026 match number (73-104) so the live bracket tree places each knockout fixture correctly. Fill this at draw time (~June 26): run load_fixtures.py, read the new knockout fixture_ids from the Matches table, and pair each with its FIFA match number from the official schedule. Until then (or for any fixture left unmapped) the tree falls back to kickoff order within each round, which FIFA's chronological numbering usually matches anyway.",
+  "fixture_to_match": {}
+}
