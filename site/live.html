@@ -12,7 +12,7 @@
     --bg:#0a0b10; --card:#14161d; --card-soft:#1a1d26; --border:rgba(255,255,255,0.08);
     --border-strong:rgba(255,255,255,0.16); --text:#f0f0f3; --text-dim:#8a8c94; --text-mute:#5a5c64;
     --accent:#ff1c5c; --accent-soft:rgba(255,28,92,0.12); --gold:#e8b948; --gold-soft:rgba(232,185,72,0.14);
-    --p1:#4ec9b0; --p1-soft:rgba(78,201,176,0.14); --p2:#c586c0; --p2-soft:rgba(197,134,192,0.16);
+    --p1:#219ebc; --p1-soft:rgba(33,158,188,0.16); --p2:#fb8500; --p2-soft:rgba(251,133,0,0.15);
     --good:#5ade8c; --bad:#ff5a5a;
   }
   *{box-sizing:border-box;margin:0;padding:0}
@@ -181,7 +181,7 @@
   .ttag{display:inline-flex;align-items:center;gap:6px;font-family:'Antonio',sans-serif;font-size:13px;font-weight:600;
     letter-spacing:.05em;border:1px solid var(--border-strong);border-radius:5px;padding:5px 9px;background:var(--card-soft)}
   .ttag .kit{width:4px;height:14px;border-radius:2px}
-  .ttag.both{background:linear-gradient(90deg, rgba(78,201,176,0.13), rgba(197,134,192,0.13));border-color:var(--border-strong)}
+  .ttag.both{background:linear-gradient(90deg, rgba(33,158,188,0.15), rgba(251,133,0,0.13));border-color:var(--border-strong)}
   .ttag.hit{border-color:rgba(90,222,140,.5)} .ttag.hit .code{color:var(--good)}
   .ttag.miss{opacity:.45} .ttag.miss .code{text-decoration:line-through}
   .ttag.tok{border-color:rgba(232,185,72,.55)}
@@ -227,7 +227,7 @@
   .bk-slot.pa::before{content:'';position:absolute;left:0;top:0;bottom:0;width:2px;background:var(--p1)}
   .bk-slot.pc{background:var(--p2-soft)} .bk-slot.pc .code{color:var(--p2)}
   .bk-slot.pc::before{content:'';position:absolute;left:0;top:0;bottom:0;width:2px;background:var(--p2)}
-  .bk-slot.pboth{background:linear-gradient(90deg,rgba(78,201,176,.13),rgba(197,134,192,.13))}
+  .bk-slot.pboth{background:linear-gradient(90deg,rgba(33,158,188,.15),rgba(251,133,0,.13))}
   .bk-slot.pboth .code{color:var(--text)}
   .bk-slot.pboth::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;
     background:linear-gradient(180deg,var(--p1) 50%,var(--p2) 50%)}
@@ -524,8 +524,8 @@ function header(){
   });
   $("#h2h").innerHTML=h;
   if(P1().name&&P2().name) $("#subtitle").textContent=P1().name+" v "+P2().name+" · Head-to-head";
-  document.documentElement.style.setProperty("--p1", P1().color||"#4ec9b0");
-  document.documentElement.style.setProperty("--p2", P2().color||"#c586c0");
+  document.documentElement.style.setProperty("--p1", P1().color||"#219ebc");
+  document.documentElement.style.setProperty("--p2", P2().color||"#fb8500");
 }
 
 /* ---- match cards (mockup 04, live) ---- */
@@ -1106,8 +1106,8 @@ function demoData(){
   return {
     generated_at:new Date().toISOString(),
     players:[
-      {name:"Andreas",color:"#4ec9b0",total_score:33,tokens:{Double:2,Triple:2,AllIn:0},mulligans:1,locked:true,locked_at:"2026-06-09T10:00:00Z"},
-      {name:"Cal",color:"#c586c0",total_score:75,tokens:{Double:2,Triple:0,AllIn:1},mulligans:1,locked:true,locked_at:"2026-06-10T08:00:00Z"},
+      {name:"Andreas",color:"#219ebc",total_score:33,tokens:{Double:2,Triple:2,AllIn:0},mulligans:1,locked:true,locked_at:"2026-06-09T10:00:00Z"},
+      {name:"Cal",color:"#fb8500",total_score:75,tokens:{Double:2,Triple:0,AllIn:1},mulligans:1,locked:true,locked_at:"2026-06-10T08:00:00Z"},
     ],
     teams:teams, matches:matches, standings:standings, sideGames:sideGames,
     picks:{Andreas:picksA, Cal:picksC},

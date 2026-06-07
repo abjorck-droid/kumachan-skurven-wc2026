@@ -155,6 +155,12 @@ then commit & push everything (GitHub Desktop). In the batch:
 1. **Clear the git lock again, commit, push** (above).
 2. **Add a Number field named `elapsed` to the `Matches` table** in the Airtable UI (one click;
    needed for live minutes on match cards — the poller warns but keeps working without it).
+2b. **New player accent colors** (Coolors palette, decided end of session): Andreas =
+   **blue green `#219EBC`**, Cal = **tiger orange `#FB8500`**. CSS defaults, demo data, and the
+   both-agree gradients are updated in `site/live.html` + `site/index.html` — but
+   **`PoolPlayers.display_color` in Airtable overrides the CSS on the live board**, so update
+   those two fields (or clear them) to make it real. Known trade-off: orange is now kin to the
+   gold token color (~12° apart); they touch on token tags over Cal-colored slots. Accepted.
 3. **Send Cal his link** (`…/?p={cal-token}` from `PoolPlayers`) if not already done.
 4. **Both: enter and LOCK picks before 2026-06-11.**
 5. Sanity-check `…/live.html` against the real base (expect the "picks appear as players lock"
