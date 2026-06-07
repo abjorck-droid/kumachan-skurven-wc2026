@@ -45,6 +45,11 @@ MATCH_PTS = {
 }
 BRACKET_PTS = {"R16": 5, "QF": 10, "SF": 20, "Finalist": 40, "Champion": 150}  # Champion 150 (locked 2026-06-06)
 DARK_HORSE = {"R16": 25, "QF": 75, "SF": 200, "Final": 500, "Champion": 1000}
+# Per-match bonus bets (spec §bonus bets; binary, "No" on Over 2.5 = Under 2.5).
+# Co-participation rule: a match's bonus bets only score if BOTH players attached
+# at least one bonus bet (of any type) to that match.
+BONUS_PTS = {"BTTS": 10, "Over 2.5 goals": 10, "Penalty in match": 15,
+             "Red card in match": 20, "Both teams score 2+": 15, "Goal in first 15 min": 15}
 BEAT_RIVAL = 3
 TOKEN_MULT = {"Double": 2, "Triple": 3, "AllIn": 5}
 MULLIGAN_FACTOR = 0.5
@@ -169,6 +174,41 @@ def rv_winners(rv):
 def side_game_hit(guess, rv):
     return norm(guess) in rv_winners(rv) if guess is not None else False
 
+def bonus_actuals(hs, as_, events):
+    """Actual Yes/No outcome of every bonus-bet type for a finished match.
+    events: parsed events_json list. Shootout kicks never count; a VAR-cancelled
+    penalty is not an awarded penalty; a missed penalty IS one. Own goals count
+    toward 'Goal in first 15 min' (a goal is a goal); score-based bets read the
+    stored full-time score (extra time included)."""
+    pen = red = early = False
+    for ev in events or []:
+        t = (ev.get("type") or "").lower()
+        d = (ev.get("detail") or "").lower()
+        c = (ev.get("comments") or "").lower()
+        if "shootout" in c or "shootout" in d:
+            continue
+        if t == "card" and "red" in d:
+            red = True
+        if "penalty" in d and "cancel" not in d:
+            pen = True
+        if t == "goal" and "missed" not in d:
+            if ((ev.get("time") or {}).get("elapsed") or 0) <= 15:
+                early = True
+    hs = hs or 0; as_ = as_ or 0
+    return {"BTTS": hs > 0 and as_ > 0,
+            "Over 2.5 goals": hs + as_ >= 3,
+            "Penalty in match": pen,
+            "Red card in match": red,
+            "Both teams score 2+": hs >= 2 and as_ >= 2,
+            "Goal in first 15 min": early}
+
+def score_bonus(bet_type, bet_value, actuals):
+    """-> (base_points, correct) for one bonus bet against computed actuals."""
+    if bet_type not in BONUS_PTS or bet_type not in actuals:
+        return 0, False
+    correct = (norm(bet_value) == "yes") == bool(actuals[bet_type])
+    return (BONUS_PTS[bet_type] if correct else 0), correct
+
 # ---- credentials + Airtable client -----------------------------------------
 def load_keys():
     keys = {k: os.environ.get(k) for k in ("AIRTABLE_PAT", "AIRTABLE_BASE_ID")}
@@ -247,7 +287,7 @@ def main():
     rec2sg = {r["id"]: r["fields"] for r in sgs}
     matches = at_list(base, "Matches", pat,
                       fields=["fixture_id", "round", "status", "home_score", "away_score",
-                              "home_team", "away_team", "winner"])
+                              "home_team", "away_team", "winner", "events_json"])
     pool = at_list(base, "PoolPlayers", pat, fields=["name"])
     rec2player = {r["id"]: r["fields"].get("name") for r in pool}
     preds = at_list(base, "Predictions", pat)
@@ -268,11 +308,16 @@ def main():
         tier = round_tier(f.get("round"))
         h = [rec2team[x]["team_id"] for x in (f.get("home_team") or []) if x in rec2team]
         a = [rec2team[x]["team_id"] for x in (f.get("away_team") or []) if x in rec2team]
+        try:
+            events = json.loads(f.get("events_json") or "[]")
+        except (ValueError, TypeError):
+            events = []
         match_by_rec[r["id"]] = {
             "tier": tier, "status": f.get("status"),
             "hs": f.get("home_score"), "as": f.get("away_score"),
             "home": h[0] if h else None, "away": a[0] if a else None,
             "winner": next((rec2team[x]["team_id"] for x in (f.get("winner") or []) if x in rec2team), None),
+            "events": events if isinstance(events, list) else [],
         }
         if tier:
             s = teams_in_match_tier.setdefault(tier, set())
@@ -293,6 +338,7 @@ def main():
     total_goals_guess = {}   # player -> guessed scalar (for the cross-player resolve)
     total_goals_rows = {}    # player -> pred rec  (where to write the result)
     total_goals_sg = None    # the SideGames fields for Total Tournament Goals
+    bonus_rows = []          # (pred rec, fields, player, match_rec) — scored after the loop
 
     for r in preds:
         f = r["fields"]
@@ -329,6 +375,13 @@ def main():
             if tid is not None:
                 bp = dark_horse_payout(tid, teams_in_match_tier, champion_id)   # live value
                 res = final_done                                               # final figure at tournament end
+
+        elif ptype == "bonus_bet":
+            # needs the full per-match opt-in picture (co-participation) — defer
+            mlink = (f.get("match") or [None])[0]
+            bonus_rows.append((rec, f, player, mlink))
+            base_pts[rec] = 0; resolved[rec] = False
+            continue
 
         elif ptype == "side_game":
             sg = rec2sg.get((f.get("side_game") or [None])[0], {})
@@ -370,6 +423,26 @@ def main():
                 resolved[rec] = True
         except (ValueError, TypeError):
             pass
+
+    # --- bonus bets: co-participation, then independent scoring -----------------
+    # A match's bonus bets only score if BOTH players attached at least one bet to
+    # it (anti-carpet-bomb). One-sided opt-ins resolve to 0 (void) when the match
+    # finishes. No Beat-Rival on bonus bets; tokens/mulligan apply in finalize.
+    optin = {}                                    # match_rec -> set(players with ≥1 bet)
+    for _rec, _f, player, mlink in bonus_rows:
+        if mlink is not None:
+            optin.setdefault(mlink, set()).add(player)
+    for rec, f, player, mlink in bonus_rows:
+        m = match_by_rec.get(mlink)
+        if not m or m["status"] != "Finished":
+            continue                              # stays unresolved until FT
+        resolved[rec] = True
+        if len(optin.get(mlink, set())) >= 2:
+            actuals = bonus_actuals(m["hs"], m["as"], m["events"])
+            bp, _ = score_bonus(f.get("bonus_bet_type"), f.get("bonus_bet_value"), actuals)
+            base_pts[rec] = bp
+        else:
+            base_pts[rec] = 0                     # void — opponent never opted in
 
     # --- Beat-Cal bonus: per match, correct AND a rival is not correct → +3 ---
     beat = {}    # pred rec -> bonus

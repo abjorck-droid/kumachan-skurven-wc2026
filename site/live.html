@@ -89,6 +89,11 @@
   .chip .tokmark{color:var(--gold);font-size:10px}
   .chip .pts{color:var(--gold);font-size:10.5px}
   .chip.hidden-pick{border-style:dashed;color:var(--text-mute);font-weight:400}
+  .chip.void{opacity:.55;border-style:dashed;text-decoration:none}
+  .bline{grid-column:1/-1;display:flex;gap:6px;flex-wrap:wrap;align-items:center;
+    border-top:1px dashed var(--border);padding-top:6px;margin-top:2px}
+  .bline .blab{font-family:'Antonio',sans-serif;font-size:9.5px;letter-spacing:.12em;
+    text-transform:uppercase;color:var(--text-mute)}
 
   /* scoreboard category table */
   .cats{display:grid;grid-template-columns:1fr auto auto;gap:0;background:var(--card);border:1px solid var(--border);
@@ -151,6 +156,7 @@
   @media (max-width:680px){
     .mrow{grid-template-columns:1fr 70px;grid-template-areas:"teams mid" "picks picks"}
     .mrow .mteams{grid-area:teams} .mrow .mid{grid-area:mid} .mrow .mpicks{grid-area:picks;justify-content:flex-start;margin-top:4px}
+    .mrow .bline{grid-area:auto;grid-column:1/-1}
     .ladder,.dh{grid-template-columns:1fr}
     .sgrow,.sghead{grid-template-columns:1fr 1fr;}
     .sghead{display:none}
@@ -224,19 +230,29 @@ function bracketTiers(D){
 function categoryTotals(D){
   var res={};
   (D.players||[]).forEach(function(pl){
-    var c={match:0,bracket:0,side:0,dark:0,rival:0};
+    var c={match:0,bracket:0,side:0,dark:0,bonus:0,rival:0};
     ((D.picks||{})[pl.name]||[]).forEach(function(p){
       var pts=p.points||0;
       if(p.type==="match_outcome"||p.type==="match_exact_score") c.match+=pts;
       else if(p.type==="bracket_slot") c.bracket+=pts;
       else if(p.type==="dark_horse") c.dark+=pts;
       else if(p.type==="side_game") c.side+=pts;
+      else if(p.type==="bonus_bet") c.bonus+=pts;
       c.rival+=(p.rival_bonus||0);
     });
-    c.total=c.match+c.bracket+c.side+c.dark+c.rival;
+    c.total=c.match+c.bracket+c.side+c.dark+c.bonus+c.rival;
     res[pl.name]=c;
   });
   return res;
+}
+function bonusLabel(p){
+  if(p.bet_type==="Over 2.5 goals") return p.bet_value==="Yes"?"Over 2.5":"Under 2.5";
+  var short={"BTTS":"BTTS","Penalty in match":"Pen","Red card in match":"Red",
+             "Both teams score 2+":"2+ each","Goal in first 15 min":"Goal<15’"}[p.bet_type]||p.bet_type||"?";
+  return short+" "+(p.bet_value||"?");
+}
+function bonusPicksFor(picks, fid){
+  return (picks||[]).filter(function(p){ return p.type==="bonus_bet" && p.match_id===fid; });
 }
 function pickAnswer(p, teamById){
   if(!p) return null;
@@ -310,6 +326,28 @@ function pickChip(name, m){
   return '<span class="'+c+'"'+note+'><span class="ow"></span>'+esc(lbl)+(st.exact?" ◎":"")+tokmark(p.token)+pts+'</span>';
 }
 
+function bonusLine(m){
+  // bonus bets only arrive from /api/public once the match has kicked off
+  var bA=bonusPicksFor(D.picks[P1().name], m.fixture_id);
+  var bC=bonusPicksFor(D.picks[P2().name], m.fixture_id);
+  if(!bA.length && !bC.length) return "";
+  var voided = m.status==="Finished" && (!bA.length || !bC.length);   // co-participation failed
+  var h='<div class="bline"><span class="blab">Bonus</span>';
+  [[bA,1],[bC,2]].forEach(function(pair){
+    pair[0].forEach(function(p){
+      var st="", pts="";
+      if(m.status==="Finished" && p.resolved){
+        if(voided) st=" void";
+        else { st = p.points>0 ? " hit" : " miss";
+          if(p.points>0) pts='<span class="pts">+'+(p.points+(p.rival_bonus||0))+'</span>'; }
+      }
+      var note=p.note?' title="'+esc(p.note)+'"':"";
+      h+='<span class="chip p'+pair[1]+st+(p.token?" tok":"")+'"'+note+'><span class="ow"></span>'+
+         esc(bonusLabel(p))+(voided?" · void":"")+tokmark(p.token)+pts+'</span>';
+    });
+  });
+  return h+'</div>';
+}
 function matchRow(m){
   var live=m.status==="Live";
   var sc, st;
@@ -321,7 +359,8 @@ function matchRow(m){
     '<div class="mteams">'+kit(t1.kit)+esc(m.home_code||m.home_name||"?")+
       '<span class="vs">v</span>'+kit(t2.kit)+esc(m.away_code||m.away_name||"?")+'</div>'+
     '<div class="mid"><div class="sc">'+sc+'</div><div class="st'+(live?" live":"")+'">'+esc(st)+'</div></div>'+
-    '<div class="mpicks">'+pickChip(P1().name,m)+pickChip(P2().name,m)+'</div></div>';
+    '<div class="mpicks">'+pickChip(P1().name,m)+pickChip(P2().name,m)+'</div>'+
+    bonusLine(m)+'</div>';
 }
 
 function boardTab(){
@@ -345,7 +384,7 @@ function boardTab(){
   h+='<h2>Points by category</h2>';
   h+='<div class="cats">'+
     '<div class="hd">Category</div><div class="hd num c1">'+esc(P1().name)+'</div><div class="hd num c2">'+esc(P2().name)+'</div>';
-  [["Match picks","match"],["Bracket ladder","bracket"],["Side games","side"],["Dark Horse","dark"],["Beat-rival bonus","rival"]].forEach(function(r){
+  [["Match picks","match"],["Bracket ladder","bracket"],["Side games","side"],["Dark Horse","dark"],["Bonus bets","bonus"],["Beat-rival bonus","rival"]].forEach(function(r){
     h+='<div>'+r[0]+'</div><div class="num c1">'+(c1[r[1]]||0)+'</div><div class="num c2">'+(c2[r[1]]||0)+'</div>';
   });
   h+='<div class="tot">Total</div><div class="num c1 tot">'+(c1.total||0)+'</div><div class="num c2 tot">'+(c2.total||0)+'</div></div>';
@@ -566,6 +605,9 @@ function demoData(){
     {key:"side|Golden Boot",type:"side_game",side_game:"Golden Boot",player_name:"E. Haaland"},
     {key:"side|Total Tournament Goals",type:"side_game",side_game:"Total Tournament Goals",scalar:145},
     {key:"side|First Red Card",type:"side_game",side_game:"First Red Card",text:"S. Ramos Jr.",points:0,resolved:true},
+    {key:"bonus|100|1",type:"bonus_bet",match_id:100,bet_type:"Red card in match",bet_value:"Yes",token:"Triple",points:60,resolved:true,note:"Derby energy."},
+    {key:"bonus|102|1",type:"bonus_bet",match_id:102,bet_type:"Over 2.5 goals",bet_value:"No",points:0,resolved:true},
+    {key:"bonus|101|1",type:"bonus_bet",match_id:101,bet_type:"Penalty in match",bet_value:"Yes"},
   ];
   var picksC=[
     {key:"Champion",type:"bracket_slot",bracket_slot:"Champion",team_id:6,token:"Triple"},
@@ -580,6 +622,9 @@ function demoData(){
     {key:"side|Golden Boot",type:"side_game",side_game:"Golden Boot",player_name:"K. Mbappé"},
     {key:"side|Total Tournament Goals",type:"side_game",side_game:"Total Tournament Goals",scalar:152},
     {key:"side|First Red Card",type:"side_game",side_game:"First Red Card",text:"J. Ramírez",token:"Double",points:60,resolved:true,note:"He plays angry."},
+    {key:"bonus|100|1",type:"bonus_bet",match_id:100,bet_type:"BTTS",bet_value:"Yes",points:10,resolved:true},
+    {key:"bonus|100|2",type:"bonus_bet",match_id:100,bet_type:"Goal in first 15 min",bet_value:"Yes",points:0,resolved:true},
+    {key:"bonus|101|1",type:"bonus_bet",match_id:101,bet_type:"Red card in match",bet_value:"No"},
   ];
   return {
     generated_at:new Date().toISOString(),

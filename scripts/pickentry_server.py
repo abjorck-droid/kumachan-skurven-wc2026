@@ -24,6 +24,9 @@ ROOT = Path(__file__).resolve().parent.parent
 SITE = ROOT / "site" / "index.html"
 REST = "https://api.airtable.com/v0"
 START_TOKENS = {"Double": 4, "Triple": 2, "AllIn": 1}
+# Per-match bonus-bet menu (mirrors the Pages Function; all binary Yes/No).
+BONUS_TYPES = ["BTTS", "Over 2.5 goals", "Penalty in match", "Red card in match",
+               "Both teams score 2+", "Goal in first 15 min"]
 
 def load_keys():
     keys = {k: os.environ.get(k) for k in ("AIRTABLE_PAT", "AIRTABLE_BASE_ID")}
@@ -111,6 +114,11 @@ def prediction_fields(player, pick, team_map, player_rec, sidegame_map, football
         rec["predicted_text"] = pick["player_text"]
     if pick.get("scalar") is not None and pick["scalar"] != "":
         rec["predicted_scalar"] = pick["scalar"]
+    # per-match bonus bets (binary)
+    if pick.get("bet_type"):
+        rec["bonus_bet_type"] = pick["bet_type"]
+    if pick.get("bet_value"):
+        rec["bonus_bet_value"] = pick["bet_value"]
     if pick.get("token"):
         rec["confidence_token"] = pick["token"]
     if pick.get("pundit_note"):
@@ -162,22 +170,22 @@ def bootstrap(player):
         footballers.sort(key=lambda x: ((x.get("group") or "Z"), (x.get("team_code") or ""), (x.get("name") or "")))
     except Exception:
         footballers, rec2pid = [], {}
-    # Group-stage fixtures (empty until load_fixtures.py runs). Group stage only — knockout
-    # pairings don't exist at kickoff, so they can't be picked yet.
+    # All fixtures (empty until load_fixtures.py runs). The match-picks tab filters to group
+    # rounds in the UI; bonus bets can attach to ANY not-yet-started match, knockouts included.
     matches, mrec2fid = [], {}
     try:
-        for r in at_list("Matches", fields=["fixture_id", "label", "round", "home_team", "away_team", "kickoff_utc"]):
+        for r in at_list("Matches", fields=["fixture_id", "label", "round", "home_team", "away_team", "kickoff_utc", "status"]):
             f = r.get("fields", {})
             fid = f.get("fixture_id")
-            rnd = f.get("round") or ""
-            if fid is None or not str(rnd).lower().startswith("group"):
+            if fid is None:
                 continue
             mrec2fid[r["id"]] = fid
             h = f.get("home_team") or []
             a = f.get("away_team") or []
             hi = team_by_rec.get(h[0]) if h else {}
             ai = team_by_rec.get(a[0]) if a else {}
-            matches.append({"fixture_id": fid, "round": rnd, "kickoff": f.get("kickoff_utc"),
+            matches.append({"fixture_id": fid, "round": f.get("round") or "", "kickoff": f.get("kickoff_utc"),
+                            "status": f.get("status") or "Scheduled",
                             "group": (hi or {}).get("group") or (ai or {}).get("group"),
                             "home_id": (hi or {}).get("team_id"), "home_code": (hi or {}).get("code"),
                             "home_name": (hi or {}).get("name"), "away_id": (ai or {}).get("team_id"),
@@ -202,6 +210,7 @@ def bootstrap(player):
                              "player_text": f.get("predicted_text"), "scalar": f.get("predicted_scalar"),
                              "outcome": f.get("predicted_outcome"),
                              "score_home": f.get("predicted_score_home"), "score_away": f.get("predicted_score_away"),
+                             "bet_type": f.get("bonus_bet_type"), "bet_value": f.get("bonus_bet_value"),
                              "token": f.get("confidence_token"), "note": f.get("pundit_note")})
             if f.get("locked_at"):
                 locked = True
@@ -227,11 +236,106 @@ def save(player, picks):
     records = [prediction_fields(player, p, team_map, player_rec, sg_map, foot_map, match_map) for p in picks if p.get("key")]
     n = at_upsert("Predictions", records, ["label"]) if records else 0
     used = token_counts(picks)
+    # bonus bets live outside this payload (saved via /api/savebonus) but share the budget
+    for r in at_list("Predictions", fields=["label", "prediction_type", "confidence_token"]):
+        f = r.get("fields", {})
+        if (f.get("label", "").startswith(player + "|") and f.get("prediction_type") == "bonus_bet"
+                and f.get("confidence_token") in used):
+            used[f["confidence_token"]] += 1
     at("PATCH", f"{BASE}/PoolPlayers", {"records": [{"id": player_rec, "fields": {
         "tokens_remaining_double": START_TOKENS["Double"] - used["Double"],
         "tokens_remaining_triple": START_TOKENS["Triple"] - used["Triple"],
         "tokens_remaining_allin": START_TOKENS["AllIn"] - used["AllIn"]}}]})
     return {"saved": n, "tokensUsed": used}
+
+def at_delete(table, ids):
+    n = 0
+    for i in range(0, len(ids), 10):
+        qs = "&".join("records[]=" + urllib.parse.quote(rid) for rid in ids[i:i + 10])
+        at("DELETE", f"{BASE}/{urllib.parse.quote(table)}?{qs}")
+        time.sleep(0.2)
+        n += len(ids[i:i + 10])
+    return n
+
+def save_bonus(player, picks):
+    """Per-match bonus bets (mirrors the Pages Function): open after tournament lock,
+    gated per match by kickoff, full-replace for not-yet-started matches, shared
+    token budget enforced across ALL of the player's predictions."""
+    import re as _re
+    prow = get_player(player)
+    if not prow:
+        raise RuntimeError(f"player '{player}' not found in PoolPlayers")
+    player_rec = prow["id"]
+    now = dt.datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
+
+    match_map, kickoff_of, status_of = {}, {}, {}
+    for r in at_list("Matches", fields=["fixture_id", "kickoff_utc", "status"]):
+        f = r.get("fields", {})
+        if f.get("fixture_id") is None:
+            continue
+        fid = int(f["fixture_id"])
+        match_map[fid] = r["id"]
+        kickoff_of[fid] = f.get("kickoff_utc") or ""
+        status_of[fid] = f.get("status") or "Scheduled"
+
+    def started(fid):
+        return (status_of.get(fid) and status_of[fid] != "Scheduled") or \
+               (kickoff_of.get(fid) and kickoff_of[fid] <= now)
+
+    by_slot = {}
+    for p in picks or []:
+        if not p or not p.get("key"):
+            continue
+        m = _re.match(r"^bonus\|(\d+)\|([12])$", p["key"])
+        if not m:
+            raise RuntimeError(f"bad bonus key '{p['key']}'")
+        fid = int(m.group(1))
+        if fid not in match_map:
+            raise RuntimeError(f"unknown match {fid}")
+        if started(fid):
+            raise RuntimeError(f"match {fid} has already kicked off — bonus bets are locked")
+        if p.get("bet_type") not in BONUS_TYPES:
+            raise RuntimeError(f"bad bet type '{p.get('bet_type')}'")
+        if p.get("bet_value") not in ("Yes", "No"):
+            raise RuntimeError(f"bad bet value '{p.get('bet_value')}'")
+        by_slot[p["key"]] = {"key": p["key"], "type": "bonus_bet", "match_id": fid,
+                             "bet_type": p["bet_type"], "bet_value": p["bet_value"],
+                             "token": p.get("token"), "pundit_note": p.get("pundit_note")}
+    new_picks = list(by_slot.values())
+
+    rec2fid = {rid: fid for fid, rid in match_map.items()}
+    mine = [r for r in at_list("Predictions", fields=["label", "prediction_type", "confidence_token", "match"])
+            if r.get("fields", {}).get("label", "").startswith(player + "|")]
+    future_rows, locked_tokens = [], {"Double": 0, "Triple": 0, "AllIn": 0}
+    for r in mine:
+        f = r.get("fields", {})
+        is_bonus = f.get("prediction_type") == "bonus_bet"
+        fid = rec2fid.get((f.get("match") or [None])[0]) if is_bonus else None
+        if is_bonus and fid is not None and not started(fid):
+            future_rows.append(r)
+            continue
+        if f.get("confidence_token") in locked_tokens:
+            locked_tokens[f["confidence_token"]] += 1
+
+    used = dict(locked_tokens)
+    for p in new_picks:
+        if p.get("token") in used:
+            used[p["token"]] += 1
+    for t, mx in START_TOKENS.items():
+        if used[t] > mx:
+            raise RuntimeError(f"token budget exceeded: {used[t]}×{t} placed, {mx} available")
+
+    keep = {f"{player}|{p['key']}" for p in new_picks}
+    doomed = [r["id"] for r in future_rows if r.get("fields", {}).get("label") not in keep]
+    deleted = at_delete("Predictions", doomed) if doomed else 0
+    records = [prediction_fields(player, p, {}, player_rec, {}, {}, match_map) for p in new_picks]
+    saved = at_upsert("Predictions", records, ["label"]) if records else 0
+
+    at("PATCH", f"{BASE}/PoolPlayers", {"records": [{"id": player_rec, "fields": {
+        "tokens_remaining_double": START_TOKENS["Double"] - used["Double"],
+        "tokens_remaining_triple": START_TOKENS["Triple"] - used["Triple"],
+        "tokens_remaining_allin": START_TOKENS["AllIn"] - used["AllIn"]}}]})
+    return {"saved": saved, "deleted": deleted, "tokensUsed": used}
 
 def lock(player):
     now = dt.datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
@@ -276,6 +380,8 @@ class Handler(BaseHTTPRequestHandler):
         try:
             if u.path == "/api/save":
                 return self._send(200, save(body["player"], body.get("picks", [])))
+            if u.path == "/api/savebonus":
+                return self._send(200, save_bonus(body["player"], body.get("picks", [])))
             if u.path == "/api/lock":
                 return self._send(200, lock(body["player"]))
         except Exception as e:

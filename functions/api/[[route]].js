@@ -4,6 +4,11 @@
 //   GET  /api/bootstrap?p=TOKEN          -> teams, side games, footballers, the player's existing picks
 //   POST /api/save?p=TOKEN   {picks:[]}  -> upsert that player's predictions, recompute token reserves
 //   POST /api/lock?p=TOKEN               -> stamp locked_at on all of that player's predictions
+//   POST /api/savebonus?p=TOKEN {picks:[]} -> per-match bonus bets. Stays open after tournament
+//                                           lock; gated per match by kickoff. Full-replace
+//                                           semantics for not-yet-started matches (cleared slots
+//                                           are deleted); started matches are immutable. Token
+//                                           budget enforced across ALL of the player's predictions.
 //   GET  /api/public                     -> NO token. Sanitized read-only feed for the public view:
 //                                           scores, standings, matches, and each player's picks —
 //                                           revealed only once THAT player has locked. Never includes
@@ -16,6 +21,11 @@
 
 const REST = "https://api.airtable.com/v0";
 const START_TOKENS = { Double: 4, Triple: 2, AllIn: 1 };
+// Per-match bonus-bet menu (spec §bonus bets, all binary Yes/No; "No" on Over 2.5 = Under).
+const BONUS_TYPES = ["BTTS", "Over 2.5 goals", "Penalty in match", "Red card in match",
+  "Both teams score 2+", "Goal in first 15 min"];
+
+const httpErr = (msg, status) => Object.assign(new Error(msg), { status });
 
 const json = (obj, status = 200, extraHeaders = {}) =>
   new Response(JSON.stringify(obj), { status, headers: { "Content-Type": "application/json", ...extraHeaders } });
@@ -68,6 +78,16 @@ async function atUpsert(env, table, records, mergeOn) {
   return n;
 }
 
+async function atDelete(env, table, ids) {
+  let n = 0;
+  for (let i = 0; i < ids.length; i += 10) {
+    const qs = ids.slice(i, i + 10).map((id) => "records[]=" + encodeURIComponent(id)).join("&");
+    await atReq(env, "DELETE", `${env.AIRTABLE_BASE_ID}/${encodeURIComponent(table)}?${qs}`);
+    n += Math.min(10, ids.length - i);
+  }
+  return n;
+}
+
 // ---- pure transform (mirrors pickentry_server.prediction_fields) -----------
 function predictionFields(playerName, pick, teamMap, playerRec, sgMap, footMap, matchMap) {
   matchMap = matchMap || {};
@@ -88,6 +108,9 @@ function predictionFields(playerName, pick, teamMap, playerRec, sgMap, footMap, 
   if (pick.score_home != null && pick.score_home !== "") rec.predicted_score_home = pick.score_home;
   if (pick.score_away != null && pick.score_away !== "") rec.predicted_score_away = pick.score_away;
   if (pick.scalar != null && pick.scalar !== "") rec.predicted_scalar = pick.scalar;
+  // per-match bonus bets (binary)
+  if (pick.bet_type) rec.bonus_bet_type = pick.bet_type;
+  if (pick.bet_value) rec.bonus_bet_value = pick.bet_value;
   if (pick.token) rec.confidence_token = pick.token;
   if (pick.pundit_note) rec.pundit_note = pick.pundit_note;
   return rec;
@@ -152,18 +175,19 @@ async function bootstrap(env, prow) {
       (a.name || "").localeCompare(b.name || ""));
   } catch (e) { footballers = []; rec2pid = {}; }
 
-  // Group-stage fixtures (empty until load_fixtures.py runs). Group stage only.
+  // All fixtures (empty until load_fixtures.py runs). The match-picks tab filters to group
+  // rounds itself; bonus bets can attach to ANY not-yet-started match, knockouts included.
   let matches = [];
   try {
-    for (const r of await atList(env, "Matches", ["fixture_id", "label", "round", "home_team", "away_team", "kickoff_utc"])) {
+    for (const r of await atList(env, "Matches", ["fixture_id", "label", "round", "home_team", "away_team", "kickoff_utc", "status"])) {
       const f = r.fields || {};
       const fid = f.fixture_id;
-      const rnd = f.round || "";
-      if (fid == null || !String(rnd).toLowerCase().startsWith("group")) continue;
+      if (fid == null) continue;
       const h = f.home_team || [], a = f.away_team || [];
       const hi = h.length ? (teamByRec[h[0]] || {}) : {};
       const ai = a.length ? (teamByRec[a[0]] || {}) : {};
-      matches.push({ fixture_id: fid, round: rnd, kickoff: f.kickoff_utc,
+      matches.push({ fixture_id: fid, round: f.round || "", kickoff: f.kickoff_utc,
+        status: f.status || "Scheduled",
         group: hi.group || ai.group,
         home_id: hi.team_id, home_code: hi.code, home_name: hi.name,
         away_id: ai.team_id, away_code: ai.code, away_name: ai.name });
@@ -189,6 +213,7 @@ async function bootstrap(env, prow) {
         player_text: f.predicted_text, scalar: f.predicted_scalar,
         outcome: f.predicted_outcome,
         score_home: f.predicted_score_home, score_away: f.predicted_score_away,
+        bet_type: f.bonus_bet_type, bet_value: f.bonus_bet_value,
         token: f.confidence_token, note: f.pundit_note,
       });
       if (f.locked_at) locked = true;
@@ -228,6 +253,13 @@ async function save(env, prow, picks) {
 
   const used = { Double: 0, Triple: 0, AllIn: 0 };
   for (const p of picks || []) if (used[p.token] != null) used[p.token]++;
+  // Bonus bets live outside this payload (saved via /api/savebonus) but share the
+  // same 7-token budget — count their tokens too before writing the reserves.
+  for (const r of await atList(env, "Predictions", ["label", "prediction_type", "confidence_token"])) {
+    const f = r.fields || {};
+    if ((f.label || "").startsWith(playerName + "|") && f.prediction_type === "bonus_bet" &&
+        used[f.confidence_token] != null) used[f.confidence_token]++;
+  }
   await atReq(env, "PATCH", `${env.AIRTABLE_BASE_ID}/PoolPlayers`, {
     records: [{ id: playerRec, fields: {
       tokens_remaining_double: START_TOKENS.Double - used.Double,
@@ -236,6 +268,79 @@ async function save(env, prow, picks) {
     } }],
   });
   return { saved: n, tokensUsed: used };
+}
+
+// ---- per-match bonus bets ---------------------------------------------------
+// Open after tournament lock; per-match gate is the kickoff. Full-replace for
+// not-yet-started matches: slots present in the payload are upserted, the player's
+// other FUTURE bonus rows are deleted, rows for started matches are never touched.
+async function saveBonus(env, prow, picks) {
+  const playerName = (prow.fields || {}).name;
+  const playerRec = prow.id;
+  const now = new Date().toISOString();
+
+  const matchMap = {}, kickoffOf = {}, statusOf = {};
+  for (const r of await atList(env, "Matches", ["fixture_id", "kickoff_utc", "status"])) {
+    const f = r.fields || {};
+    if (f.fixture_id == null) continue;
+    const fid = parseInt(f.fixture_id);
+    matchMap[fid] = r.id; kickoffOf[fid] = f.kickoff_utc || ""; statusOf[fid] = f.status || "Scheduled";
+  }
+  const started = (fid) =>
+    (statusOf[fid] && statusOf[fid] !== "Scheduled") || (kickoffOf[fid] && kickoffOf[fid] <= now);
+
+  // validate + dedupe (last write wins per slot key)
+  const bySlot = {};
+  for (const p of picks || []) {
+    if (!p || !p.key) continue;
+    const m = /^bonus\|(\d+)\|([12])$/.exec(p.key);
+    if (!m) throw httpErr(`bad bonus key '${p.key}'`, 400);
+    const fid = parseInt(m[1]);
+    if (!matchMap[fid]) throw httpErr(`unknown match ${fid}`, 400);
+    if (started(fid)) throw httpErr(`match ${fid} has already kicked off — bonus bets are locked`, 400);
+    if (!BONUS_TYPES.includes(p.bet_type)) throw httpErr(`bad bet type '${p.bet_type}'`, 400);
+    if (p.bet_value !== "Yes" && p.bet_value !== "No") throw httpErr(`bad bet value '${p.bet_value}'`, 400);
+    bySlot[p.key] = { key: p.key, type: "bonus_bet", match_id: fid,
+      bet_type: p.bet_type, bet_value: p.bet_value, token: p.token || undefined,
+      pundit_note: p.pundit_note || undefined };
+  }
+  const newPicks = Object.values(bySlot);
+
+  // the player's existing bonus rows, split into replaceable (future) and immutable (started)
+  const mine = (await atList(env, "Predictions", ["label", "prediction_type", "confidence_token", "match"]))
+    .filter((r) => ((r.fields || {}).label || "").startsWith(playerName + "|"));
+  const rec2fid = {};
+  for (const [fid, rid] of Object.entries(matchMap)) rec2fid[rid] = parseInt(fid);
+  const futureBonusRows = [], lockedTokens = { Double: 0, Triple: 0, AllIn: 0 };
+  for (const r of mine) {
+    const f = r.fields || {};
+    const isBonus = f.prediction_type === "bonus_bet";
+    const fid = isBonus ? rec2fid[(f.match || [])[0]] : null;
+    if (isBonus && fid != null && !started(fid)) { futureBonusRows.push(r); continue; }
+    if (lockedTokens[f.confidence_token] != null) lockedTokens[f.confidence_token]++;  // immutable rows
+  }
+
+  // shared token budget across everything
+  const used = { ...lockedTokens };
+  for (const p of newPicks) if (used[p.token] != null) used[p.token]++;
+  for (const [t, max] of Object.entries(START_TOKENS))
+    if (used[t] > max) throw httpErr(`token budget exceeded: ${used[t]}×${t} placed, ${max} available`, 400);
+
+  // delete cleared future slots, upsert the rest
+  const keep = new Set(newPicks.map((p) => `${playerName}|${p.key}`));
+  const doomed = futureBonusRows.filter((r) => !keep.has((r.fields || {}).label)).map((r) => r.id);
+  const deleted = doomed.length ? await atDelete(env, "Predictions", doomed) : 0;
+  const records = newPicks.map((p) => predictionFields(playerName, p, {}, playerRec, {}, {}, matchMap));
+  const saved = records.length ? await atUpsert(env, "Predictions", records, ["label"]) : 0;
+
+  await atReq(env, "PATCH", `${env.AIRTABLE_BASE_ID}/PoolPlayers`, {
+    records: [{ id: playerRec, fields: {
+      tokens_remaining_double: START_TOKENS.Double - used.Double,
+      tokens_remaining_triple: START_TOKENS.Triple - used.Triple,
+      tokens_remaining_allin: START_TOKENS.AllIn - used.AllIn,
+    } }],
+  });
+  return { saved, deleted, tokensUsed: used };
 }
 
 async function lock(env, prow) {
@@ -287,12 +392,16 @@ async function publicView(env) {
   }
   teams.sort((a, b) => (a.group || "Z").localeCompare(b.group || "Z") || (a.name || "").localeCompare(b.name || ""));
 
+  const nowIso = new Date().toISOString();
   const matchByRec = {};
   const matches = [];
+  const startedFids = new Set();      // matches at/past kickoff — bonus bets reveal here
   for (const r of matchRecs) {
     const f = r.fields || {};
     if (f.fixture_id == null) continue;
     matchByRec[r.id] = f.fixture_id;
+    if ((f.status && f.status !== "Scheduled") || (f.kickoff_utc && f.kickoff_utc <= nowIso))
+      startedFids.add(f.fixture_id);
     const h = (f.home_team || [])[0], a = (f.away_team || [])[0], w = (f.winner || [])[0];
     const hi = teamByRec[h] || {}, ai = teamByRec[a] || {};
     matches.push({
@@ -355,6 +464,12 @@ async function publicView(env) {
     const lbl = f.label || "";
     const owner = playerNames.find((n) => lbl.startsWith(n + "|"));
     if (!owner || !lockedAt[owner]) continue;           // unlocked players stay hidden
+    // Bonus bets stay sealed until their match kicks off — even for locked players
+    // (spec: "hidden until kickoff"; the blind co-participation game depends on it).
+    if (f.prediction_type === "bonus_bet") {
+      const bfid = (f.match || []).length ? matchByRec[f.match[0]] : null;
+      if (bfid == null || !startedFids.has(bfid)) continue;
+    }
     const teamLink = (f.predicted_team || [])[0];
     const p = {
       key: lbl.split("|").slice(1).join("|"),
@@ -369,6 +484,8 @@ async function publicView(env) {
       score_home: f.predicted_score_home ?? null,
       score_away: f.predicted_score_away ?? null,
       scalar: f.predicted_scalar ?? null,
+      bet_type: f.bonus_bet_type || null,
+      bet_value: f.bonus_bet_value || null,
       token: f.confidence_token || null,
       points: f.points_awarded ?? null,
       rival_bonus: f.beat_rival_bonus ?? null,
@@ -419,8 +536,12 @@ export async function onRequest(context) {
     }
     if (path.endsWith("/api/lock") && request.method === "POST")
       return json(await lock(env, prow));
+    if (path.endsWith("/api/savebonus") && request.method === "POST") {
+      const body = await request.json().catch(() => ({}));
+      return json(await saveBonus(env, prow, body.picks || []));
+    }
     return json({ error: "not found" }, 404);
   } catch (e) {
-    return json({ error: String((e && e.message) || e) }, 500);
+    return json({ error: String((e && e.message) || e) }, (e && e.status) || 500);
   }
 }

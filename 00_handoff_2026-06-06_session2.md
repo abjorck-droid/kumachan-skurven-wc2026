@@ -55,6 +55,32 @@ this session added the **public read-only live board** (was priority 1).
    manual** (needs lineups, partly judged — Andreas types it at tournament end). **Dark Horse**
    needs no `resolved_value` (engine computes its ladder directly).
 
+6. **Bonus bets are IN** (open question closed; second decision: **tokens MAY ride bonus bets**,
+   spec-faithful, shared 7-token budget). Full flow built across every layer:
+   - **Function `/api/savebonus`** (token-auth) — stays open after tournament lock, gated
+     **per match by kickoff** (server-side). Full-replace semantics for not-yet-started matches
+     (cleared slots are deleted via a new `atDelete`); started matches immutable. Token budget
+     enforced across ALL of the player's predictions (400 on overspend). `/api/save` now counts
+     bonus-row tokens when recomputing reserves. Bet menu (binary Yes/No; "No" on Over 2.5 =
+     Under): BTTS 10 · Over/Under 2.5 10 · Penalty 15 · Red card 20 · Both score 2+ 15 ·
+     Goal in first 15′ 15.
+   - **`/api/public`** — bonus picks stay sealed until their match kicks off, even for locked
+     players (the blind co-participation game depends on it); bet fields serialized after.
+   - **Engine** — `bonus_actuals()` from `events_json` (missed pen = awarded; VAR-cancelled ≠
+     awarded; shootout kicks never count; own goal counts for "goal in first 15′"),
+     `score_bonus()`, and the **co-participation rule**: a match's bonus bets only score if both
+     players attached ≥1 bet; one-sided opt-ins resolve void (0). No Beat-Rival on bonus bets;
+     tokens/mulligan apply normally.
+   - **Pick-entry** — new **Bonus bets** tab (chronological, knockouts included once loaded,
+     group-matches tab now filters group rounds since bootstrap returns all fixtures). Exempt
+     from the locked-UI freeze; per-slot bet-type + Yes/No (Over/Under labels), token + pundit
+     note; own "Save bonus bets" button; started matches shown as a read-only recap.
+   - **Live board** — bonus chip line under match rows once revealed: hit/miss/points, gold
+     token marks, dashed **void** styling when co-participation failed; "Bonus bets" row added
+     to points-by-category.
+   - **`pickentry_server.py`** — full parity port (savebonus, all-fixtures bootstrap, shared
+     token recount), so local mode keeps matching hosted.
+
 ### Verification (sandbox has no network — see environment note in prior handoff)
 - Function syntax-checked as an ES module.
 - `/api/public` integration-tested against a **stubbed Airtable** through the real router:
@@ -65,6 +91,11 @@ this session added the **public read-only live board** (was priority 1).
   first-event finality rule (live/VAR/simultaneous-kickoff cases), group-complete gating,
   tally exclusions, FIFA tie-break, end-to-end `compute_resolutions` pre/post-Final, and the
   engine's joint-winner matching. All green.
+- Bonus bets: `/api/savebonus` integration-tested through the real router with a mutable
+  Airtable stub (17 checks — kickoff gating, validation, slot-clearing deletes, cross-prediction
+  token budget, public reveal sealing); engine `bonus_actuals`/`score_bonus` (22 checks);
+  pick-entry render + collect logic under a stub DOM (15 checks); live board re-render suite
+  incl. void state (45 checks). Earlier suites re-run green after every change.
 
 ---
 
@@ -75,15 +106,18 @@ cannot delete ("Operation not permitted" on unlink across the mount). It bit us 
 **Rule going forward: Claude never runs git writes; Andreas commits/pushes via GitHub Desktop.**
 
 State as of end of session: the **public-view batch is already committed & pushed** by Andreas
-(`81043e4 "Public view update"`). The **side-game batch is staged but NOT committed**, and a
-fresh stale lock exists. **Andreas — on your Mac:**
+(`81043e4 "Public view update"`). The **side-game + bonus-bet work is NOT committed**, and a
+stale lock exists. **Andreas — on your Mac:**
 ```
 rm ~/Desktop/WorldCup2026/.git/index.lock
 ```
-then commit & push (GitHub Desktop). In the batch:
-- `scripts/resolve_sidegames.py` (new)
-- `scripts/scoring_engine.py` (joint-winner support: `rv_winners`/`side_game_hit`)
-- `.github/workflows/scoreboard-poll.yml` (poll → resolve → score)
+then commit & push everything (GitHub Desktop). In the batch:
+- `scripts/resolve_sidegames.py` (new) and `.github/workflows/scoreboard-poll.yml`
+  (poll → resolve → score)
+- `scripts/scoring_engine.py` (joint winners + full bonus-bet scoring)
+- `functions/api/[[route]].js` (`/api/savebonus`, all-fixtures bootstrap, public sealing)
+- `site/index.html` (Bonus bets tab) and `site/live.html` (bonus display)
+- `scripts/pickentry_server.py` (parity port)
 - this handoff (updated)
 
 ---
@@ -113,12 +147,15 @@ then commit & push (GitHub Desktop). In the batch:
 
 ## Open questions (carried)
 
-- Bonus bets in/out for this tournament.
 - Dark Horse display lives on the Brackets tab of the live board (and Knockouts tab of pick-entry) — fine?
 - Custom subdomain vs `pages.dev`.
+- One schema nicety: the seeded `Predictions.bonus_bet_type` select options predate the final
+  menu ("BTTS"/"Over 2.5"/"Under 2.5"/…). Writes use `typecast: true`, so the new option names
+  ("Over 2.5 goals", "Goal in first 15 min", …) auto-create on first save; the stale unused
+  options can be deleted in the Airtable UI whenever (cosmetic only — like the old "S" group).
 
 ## What I'd do first next session
 
-Nothing is buildable before the knockout draw that isn't optional — so: confirm the side-game
-batch pushed, watch the June-11 first polls, and pick from the optional list (bonus bets being
-the most game-relevant) or rest until the draw.
+Everything pre-kickoff is now built: poller, scorer, side-game resolver, pick entry, bonus bets,
+public board. Confirm the push landed, then watch the June-11 first polls. The next real build
+is the **knockout draw work (~June 26)**; before that, only sanity checks and pile-on polish.

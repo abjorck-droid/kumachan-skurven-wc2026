@@ -95,6 +95,7 @@
   <button data-tab="matches" class="on">Group matches<span class="tc" id="tc-matches"></span></button>
   <button data-tab="ko">Knockouts<span class="tc" id="tc-ko"></span></button>
   <button data-tab="side">Side bets<span class="tc" id="tc-side"></span></button>
+  <button data-tab="bonus">Bonus bets<span class="tc" id="tc-bonus"></span></button>
   <button data-tab="review">Review &amp; Lock</button>
 </div></div>
 
@@ -107,6 +108,21 @@
 <script>
 const TOKEN_OPTS = [["","— no token —"],["Double","Double ×2"],["Triple","Triple ×3"],["AllIn","All-In ×5"]];
 const START = {Double:4, Triple:2, AllIn:1};
+
+// Per-match bonus bets: [type, short label·pts, yes-label, no-label]. All binary;
+// "No" on Over 2.5 means Under 2.5 (one bet type covers the spec's Over/Under row).
+const BONUS_TYPES = [
+  ["BTTS","BTTS · 10","Yes","No"],
+  ["Over 2.5 goals","Over/Under 2.5 · 10","Over","Under"],
+  ["Penalty in match","Penalty · 15","Yes","No"],
+  ["Red card in match","Red card · 20","Yes","No"],
+  ["Both teams score 2+","Both score 2+ · 15","Yes","No"],
+  ["Goal in first 15 min","Goal in first 15′ · 15","Yes","No"],
+];
+function matchStarted(m){
+  if(m.status && m.status!=="Scheduled") return true;
+  return !!(m.kickoff && new Date(m.kickoff) <= new Date());
+}
 
 const BRACKET = [
   {title:"Champion", pts:"150 pts", slots:[["Champion","Champion"]]},
@@ -202,6 +218,41 @@ function matchRow(m){
 function numRow(key,label){ const v=(VALUES[key]||{}).scalar; const vv=(v===undefined||v===null)?"":v;
   return row(key,label,`<input type="number" min="0" data-key="${key}" data-role="scalar" placeholder="e.g. 145" value="${vv}">`); }
 
+// --- bonus bets -------------------------------------------------------------
+function betValueOptions(betType, sel){
+  const def = BONUS_TYPES.find(b=>b[0]===betType) || [null,null,"Yes","No"];
+  return `<option value="">— ? —</option>`+
+    `<option value="Yes" ${sel==="Yes"?'selected':''}>${def[2]}</option>`+
+    `<option value="No" ${sel==="No"?'selected':''}>${def[3]}</option>`;
+}
+function bonusSlotRow(m, slot){
+  const key="bonus|"+m.fixture_id+"|"+slot;
+  META[key]={type:"bonus_bet", match_id:m.fixture_id, started:matchStarted(m)};
+  const v=VALUES[key]||{};
+  const hn=m.home_code||m.home_name||"Home", an=m.away_code||m.away_name||"Away";
+  const lab = slot===1 ? `${hn} v ${an}` : "+ second bet";
+  const typeSel=`<select data-key="${key}" data-role="bet_type"><option value="">— bet type —</option>`+
+    BONUS_TYPES.map(([val,txt])=>`<option value="${val}" ${v.bet_type===val?'selected':''}>${txt}</option>`).join('')+`</select>`;
+  const valSel=`<select data-key="${key}" data-role="bet_value">${betValueOptions(v.bet_type, v.bet_value)}</select>`;
+  const tokened=v.token?' tokened':'';
+  return `<div class="row mrow${tokened}" id="row-${key}">
+    <span class="lab">${lab}</span>
+    <div class="mctl">${typeSel}${valSel}</div>
+    ${tokenSelect(key)}
+    ${noteInput(key)}
+  </div>`;
+}
+function bonusBetLabel(v){
+  const def=BONUS_TYPES.find(b=>b[0]===v.bet_type); if(!def) return "";
+  return def[1].split(" · ")[0]+": "+(v.bet_value==="Yes"?def[2]:def[3]);
+}
+function kickLabel(iso){
+  if(!iso) return "TBD";
+  const d=new Date(iso);
+  return d.toLocaleDateString(undefined,{weekday:"short",day:"numeric",month:"short"})+" · "+
+         d.toLocaleTimeString(undefined,{hour:"2-digit",minute:"2-digit"});
+}
+
 function render(){
   META = {};
   // --- Knockouts panel: bracket-slot ladder + Dark Horse ---
@@ -214,15 +265,51 @@ function render(){
   META["darkhorse"]={type:"dark_horse",side_game:"Dark Horse"};
   ko += teamRow("darkhorse","Dark Horse");
 
-  // --- Group matches panel ---
+  // --- Group matches panel (bootstrap now returns ALL fixtures; filter to group rounds) ---
   let mk = "";
-  if(DATA.matches && DATA.matches.length){
+  const groupMatches = (DATA.matches||[]).filter(m=>String(m.round||"").toLowerCase().startsWith("group"));
+  if(groupMatches.length){
     mk += `<h2>Group matches <span class="pts">· 5 pts outcome · +10 exact</span></h2><div class="sub">Call every group match. The scoreline is optional — add it only where you want the +10 exact-score bonus.</div>`;
     let g=null;
-    DATA.matches.forEach(m=>{ if(m.group!==g){ g=m.group; mk+=`<div class="grp-label">Group ${g||'?'}</div>`; } mk+=matchRow(m); });
+    groupMatches.forEach(m=>{ if(m.group!==g){ g=m.group; mk+=`<div class="grp-label">Group ${g||'?'}</div>`; } mk+=matchRow(m); });
   } else {
     mk += `<h2>Group matches</h2><div class="sub">No fixtures loaded yet — run <code>load_fixtures.py</code>.</div>`;
   }
+
+  // --- Bonus bets panel (chronological; stays editable after the main lock) ---
+  let bn = `<h2>Bonus bets <span class="pts">· up to 2 per match · lock at each kickoff</span></h2>
+    <div class="sub">Attach up to two binary bets to any match before it kicks off — this tab stays open
+    even after you lock your main picks. Bets are hidden from your opponent until kickoff, and a match's
+    bonus bets only score if <b>both players</b> put at least one bet on it (otherwise void). Tokens welcome —
+    same budget of 7.</div>`;
+  const upcoming = (DATA.matches||[]).filter(m=>!matchStarted(m))
+    .slice().sort((a,b)=>(a.kickoff||"").localeCompare(b.kickoff||""));
+  if(upcoming.length){
+    let day=null;
+    upcoming.forEach(m=>{
+      const d=(m.kickoff||"").slice(0,10);
+      if(d!==day){ day=d; bn+=`<div class="grp-label">${kickLabel(m.kickoff).split(" · ")[0]} <span style="color:var(--text-mute)">· ${d}</span></div>`; }
+      bn += `<div class="sub" style="margin:6px 0 4px">${m.home_name||m.home_code||"?"} v ${m.away_name||m.away_code||"?"} · ${kickLabel(m.kickoff).split(" · ")[1]||""}${m.round&&!String(m.round).toLowerCase().startsWith("group")?" · "+m.round:""}</div>`;
+      bn += bonusSlotRow(m,1) + bonusSlotRow(m,2);
+    });
+  } else {
+    bn += `<div class="sub">No upcoming matches to bet on${(DATA.matches||[]).length?" — everything has kicked off":" (fixtures not loaded yet)"}.</div>`;
+  }
+  // already-started matches where this player had bets — read-only recap
+  const startedBets = (DATA.matches||[]).filter(m=>matchStarted(m) &&
+    ((VALUES["bonus|"+m.fixture_id+"|1"]||{}).bet_type || (VALUES["bonus|"+m.fixture_id+"|2"]||{}).bet_type));
+  if(startedBets.length){
+    bn += `<div class="grp-label">Locked — kicked off</div>`;
+    startedBets.forEach(m=>{
+      const parts=[1,2].map(s=>VALUES["bonus|"+m.fixture_id+"|"+s]||{}).filter(v=>v.bet_type)
+        .map(v=>bonusBetLabel(v)+(v.token?" · "+v.token:""));
+      bn += `<div class="sub" style="margin:4px 0">${m.home_code||"?"} v ${m.away_code||"?"} — ${parts.join("  ·  ")}</div>`;
+    });
+  }
+  bn += `<div class="lockbar" style="margin-top:24px">
+    <button class="btn save" id="bonusSaveBtn">Save bonus bets</button>
+    <div class="hint">Saving replaces all your bonus bets on matches that haven't kicked off. Kicked-off matches can't be changed.</div>
+  </div>`;
 
   // --- Side bets panel ---
   const sgSub = hasFootballers()
@@ -249,6 +336,7 @@ function render(){
     `<div class="tabpanel" data-tab="matches">${mk}</div>`+
     `<div class="tabpanel" data-tab="ko">${ko}</div>`+
     `<div class="tabpanel" data-tab="side">${sb}</div>`+
+    `<div class="tabpanel" data-tab="bonus">${bn}</div>`+
     `<div class="tabpanel" data-tab="review">${rv}</div>`;
   $("#tabs").style.display="flex";
   setTab(ACTIVE_TAB);
@@ -261,18 +349,19 @@ function setTab(name){
   document.querySelectorAll(".tabpanel").forEach(p=>p.classList.toggle("active", p.dataset.tab===name));
   document.querySelectorAll("#tabs button").forEach(b=>b.classList.toggle("on", b.dataset.tab===name));
 }
-function hasVal(v){ return !!(v && (v.team_id||v.player_id||v.player_text||v.outcome||(v.score_home!=null&&v.score_home!=="")||(v.scalar!==undefined&&v.scalar!=="")||v.token||v.note)); }
+function hasVal(v){ return !!(v && (v.team_id||v.player_id||v.player_text||v.outcome||v.bet_type||(v.score_home!=null&&v.score_home!=="")||(v.scalar!==undefined&&v.scalar!=="")||v.token||v.note)); }
 function tabOf(key){
   if(key.startsWith("match|")) return "matches";
+  if(key.startsWith("bonus|")) return "bonus";
   if(key==="darkhorse"||(META[key]&&META[key].type==="bracket_slot")) return "ko";
   if(key.startsWith("side|")) return "side";
   return null;
 }
 function updateTabCounts(){
-  const c={matches:0,ko:0,side:0};
+  const c={matches:0,ko:0,side:0,bonus:0};
   Object.keys(META).forEach(k=>{ const t=tabOf(k); if(t && hasVal(VALUES[k])) c[t]++; });
   const set=(id,n)=>{ const e=$(id); if(e) e.textContent = n?(" "+n):""; };
-  set("#tc-matches",c.matches); set("#tc-ko",c.ko); set("#tc-side",c.side);
+  set("#tc-matches",c.matches); set("#tc-ko",c.ko); set("#tc-side",c.side); set("#tc-bonus",c.bonus);
 }
 
 function countTokens(){ const c={Double:0,Triple:0,AllIn:0};
@@ -286,7 +375,7 @@ function updateReserves(){
 }
 function updateSummary(){
   updateTabCounts();
-  const total=Object.values(VALUES).filter(v=>v.team_id||v.player_id||v.player_text||v.outcome||v.scalar!==undefined&&v.scalar!==""||v.token).length;
+  const total=Object.values(VALUES).filter(v=>v.team_id||v.player_id||v.player_text||v.outcome||v.bet_type||v.scalar!==undefined&&v.scalar!==""||v.token).length;
   const used=countTokens();
   const el=$("#summary"); if(!el) return;
   el.innerHTML = `<span>Picks made <b>${total}</b></span>
@@ -304,6 +393,12 @@ function onChange(e){
   else if(role==="score_home"){ VALUES[key].score_home = e.target.value===""?undefined:Number(e.target.value); }
   else if(role==="score_away"){ VALUES[key].score_away = e.target.value===""?undefined:Number(e.target.value); }
   else if(role==="scalar"){ VALUES[key].scalar = e.target.value===""?undefined:Number(e.target.value); }
+  else if(role==="bet_type"){
+    VALUES[key].bet_type = e.target.value || undefined;
+    const vs = document.querySelector(`select[data-role="bet_value"][data-key="${CSS.escape(key)}"]`);
+    if(vs) vs.innerHTML = betValueOptions(VALUES[key].bet_type, VALUES[key].bet_value);
+  }
+  else if(role==="bet_value"){ VALUES[key].bet_value = e.target.value || undefined; }
   else if(role==="note"){ VALUES[key].note = e.target.value || undefined; }
   else if(role==="token"){
     const prev = VALUES[key].token || "";
@@ -324,7 +419,8 @@ function flash(msg){ const s=$("#status"); s.textContent="⚠ "+msg; s.style.col
   setTimeout(()=>{ s.textContent=""; s.style.color=""; },2200); }
 
 function collectPicks(){
-  return Object.keys(META).map(key=>{
+  // bonus bets have their own save path (/api/savebonus) and their own lock rhythm
+  return Object.keys(META).filter(key=>META[key].type!=="bonus_bet").map(key=>{
     const v=VALUES[key]||{}; const m=META[key];
     const has = v.team_id||v.player_id||v.player_text||v.outcome||(v.score_home!=null&&v.score_home!=="")||(v.scalar!==undefined&&v.scalar!=="")||v.token||v.note;
     if(!has) return null;
@@ -343,6 +439,34 @@ function collectPicks(){
     if(v.note) p.pundit_note=v.note;
     return p;
   }).filter(Boolean);
+}
+
+function collectBonusPicks(){
+  return Object.keys(META).filter(key=>{
+    const m=META[key];
+    return m.type==="bonus_bet" && !m.started;        // started matches are immutable
+  }).map(key=>{
+    const v=VALUES[key]||{}; const m=META[key];
+    if(!v.bet_type || !v.bet_value) return null;       // a bet needs both halves
+    const p={key, type:"bonus_bet", match_id:m.match_id, bet_type:v.bet_type, bet_value:v.bet_value};
+    if(v.token) p.token=v.token;
+    if(v.note) p.pundit_note=v.note;
+    return p;
+  }).filter(Boolean);
+}
+
+async function saveBonusBets(){
+  const btn=$("#bonusSaveBtn"), s=$("#status"); if(btn) btn.disabled=true;
+  s.style.color=""; s.textContent="Saving bonus bets…";
+  try{
+    const picks=collectBonusPicks();
+    const res=await fetch(api("/api/savebonus"),{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({player:PLAYER,picks})});
+    const j=await res.json(); if(!res.ok) throw new Error(j.error||"save failed");
+    s.style.color="var(--good)"; s.textContent=`Bonus bets saved ✓ ${j.saved}`;
+  }catch(err){ s.style.color="var(--bad)"; s.textContent="Bonus save failed: "+err.message; }
+  finally{ if(btn) btn.disabled=false;
+    setTimeout(()=>{ if($("#status").textContent.startsWith("Bonus bets saved")) $("#status").textContent=""; },3000); }
 }
 
 async function save(){
@@ -367,7 +491,9 @@ async function lockBracket(){
 }
 function setLockedUI(){
   $("#lockBanner").style.display="block";
-  document.querySelectorAll("select,input").forEach(el=>{ if(!el.closest(".seg")) el.disabled=true; });
+  // bonus bets keep their own per-match lock (kickoff) — that tab stays live
+  document.querySelectorAll("select,input").forEach(el=>{
+    if(!el.closest(".seg") && !el.closest('.tabpanel[data-tab="bonus"]')) el.disabled=true; });
   const lb=$("#lockBtn"); if(lb){ lb.disabled=true; lb.textContent="Locked"; lb.style.opacity=".5"; }
 }
 function showErr(m){ const b=$("#errBanner"); b.textContent="⚠ "+m; b.style.display="block"; setTimeout(()=>b.style.display="none",5000); }
@@ -389,7 +515,9 @@ async function loadPlayer(player){
       player_id:p.player_id!=null?String(p.player_id):undefined, player_text:p.player_text||undefined,
       outcome:p.outcome||undefined,
       score_home:(p.score_home!=null?p.score_home:undefined), score_away:(p.score_away!=null?p.score_away:undefined),
-      scalar:(p.scalar!=null?p.scalar:undefined), token:p.token||undefined, note:p.note||undefined }; });
+      scalar:(p.scalar!=null?p.scalar:undefined),
+      bet_type:p.bet_type||undefined, bet_value:p.bet_value||undefined,
+      token:p.token||undefined, note:p.note||undefined }; });
     render();
   }catch(err){ $("#app").innerHTML=""; showErr("Couldn't load — is the base built & server running? ("+err.message+")"); }
 }
@@ -398,6 +526,7 @@ $("#app").addEventListener("change", onChange);
 $("#app").addEventListener("input", e=>{ if(["text","note","scalar","score_home","score_away"].includes(e.target.dataset.role)) onChange(e); });
 document.addEventListener("click", e=>{
   if(e.target.id==="saveBtn") save();
+  if(e.target.id==="bonusSaveBtn") saveBonusBets();
   if(e.target.id==="lockBtn") lockBracket();
   const tb=e.target.closest && e.target.closest("#tabs button");
   if(tb){ setTab(tb.dataset.tab); }
