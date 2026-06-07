@@ -364,13 +364,24 @@ async function lock(env, prow) {
 //      them to your opponent" — same rule the pick-entry UI promises).
 //   3. pundit_note rides along only after Predictions.resolved is checked
 //      ("hidden until it resolves").
+// Matches fields for the public feed. `elapsed` (live minute) is added to the base by
+// hand — requesting a nonexistent field is a 422 in Airtable, so fall back without it.
+async function listPublicMatches(env) {
+  const base = ["fixture_id", "round", "kickoff_utc", "venue", "home_team", "away_team",
+    "home_score", "away_score", "status", "winner", "winner_method"];
+  try { return await atList(env, "Matches", base.concat(["elapsed"])); }
+  catch (e) {
+    if (/UNKNOWN_FIELD_NAME/.test(String((e && e.message) || e))) return atList(env, "Matches", base);
+    throw e;
+  }
+}
+
 async function publicView(env) {
   const [playerRecs, teamRecs, matchRecs, sideRecs] = await Promise.all([
     atList(env, "PoolPlayers", ["name", "display_color", "total_score",
       "tokens_remaining_double", "tokens_remaining_triple", "tokens_remaining_allin", "mulligans_remaining"]),
     atList(env, "Teams", ["team_id", "code", "name", "group", "fifa_ranking", "kit_color_primary"]),
-    atList(env, "Matches", ["fixture_id", "round", "kickoff_utc", "venue", "home_team", "away_team",
-      "home_score", "away_score", "status", "winner", "winner_method", "elapsed"]),
+    listPublicMatches(env),
     atList(env, "SideGames", ["name", "base_points", "resolution_type", "resolved_value", "dark_horse_ladder"]),
   ]);
 
