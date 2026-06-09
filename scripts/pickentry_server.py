@@ -221,13 +221,112 @@ def bootstrap(player):
                                 "Triple": pf.get("tokens_remaining_triple", 2),
                                 "AllIn": pf.get("tokens_remaining_allin", 1)}}
 
+def bracket_guard(picks, teams_by_code):
+    """Propagated-bracket validation (mirrors the Pages Function bracketGuard).
+
+    Set-level rules always apply: no duplicate team in a round, rounds nest
+    (Champion ⊆ Finalists ⊆ SF ⊆ QF ⊆ R16), size caps. When the generating
+    structure is complete (12 group orders + 8 thirds) the house-template R32
+    is rebuilt and picks outside it — or two picks on the same bracket path —
+    are rejected. Partial/absent structure → set-level checks only.
+    """
+    import re as _re
+    def tier(k):
+        if k == "Champion": return "C"
+        if _re.match(r"^F-\d+$", k or ""): return "F"
+        if _re.match(r"^SF-\d+$", k or ""): return "SF"
+        if _re.match(r"^QF-\d+$", k or ""): return "QF"
+        if _re.match(r"^R16-\d+$", k or ""): return "R16"
+        return None
+    order = ["R16", "QF", "SF", "F", "C"]
+    mx = {"R16": 16, "QF": 8, "SF": 4, "F": 2, "C": 1}
+    name = {"R16": "Round-of-16", "QF": "quarter-final", "SF": "semi-final", "F": "finalist", "C": "champion"}
+    sets = {t: set() for t in order}
+    go, thirds = {}, None
+    for p in picks or []:
+        if not p:
+            continue
+        k = p.get("bracket_slot") or p.get("key")
+        if p.get("type") == "bracket_slot":
+            t = tier(k)
+            if not t:
+                raise RuntimeError(f"unknown bracket slot '{k}'")
+            if p.get("team_id") in (None, ""):
+                continue
+            tid = str(int(p["team_id"]))
+            if tid in sets[t]:
+                raise RuntimeError(f"duplicate team in your {name[t]} round")
+            sets[t].add(tid)
+        elif p.get("type") == "bracket_struct":
+            m = _re.match(r"^group_order\|([A-L])$", k or "")
+            if m:
+                codes = [c.strip() for c in str(p.get("player_text") or "").split(",") if c.strip()]
+                if len(codes) != 3 or len(set(codes)) != 3:
+                    raise RuntimeError(f"group_order|{m.group(1)} needs exactly 3 distinct team codes")
+                for c in codes:
+                    t = teams_by_code.get(c)
+                    if not t:
+                        raise RuntimeError(f"unknown team code '{c}' in group_order|{m.group(1)}")
+                    if t["group"] != m.group(1):
+                        raise RuntimeError(f"{c} is not in group {m.group(1)}")
+                go[m.group(1)] = [str(teams_by_code[c]["team_id"]) for c in codes]
+            elif k == "thirds_advance":
+                ls = [s.strip() for s in str(p.get("player_text") or "").split(",") if s.strip()]
+                if len(ls) > 8 or len(set(ls)) != len(ls) or any(not _re.match(r"^[A-L]$", l) for l in ls):
+                    raise RuntimeError("thirds_advance must be up to 8 distinct group letters A–L")
+                thirds = ls
+            else:
+                raise RuntimeError(f"unknown bracket_struct key '{k}'")
+    for t in order:
+        if len(sets[t]) > mx[t]:
+            raise RuntimeError(f"too many {name[t]} picks ({len(sets[t])}/{mx[t]})")
+    for i in range(len(order) - 1, 0, -1):
+        for tid in sets[order[i]]:
+            if tid not in sets[order[i - 1]]:
+                raise RuntimeError(f"bracket not nested: a {name[order[i]]} pick is missing from your {name[order[i - 1]]} round")
+    complete = all(g in go for g in "ABCDEFGHIJKL") and thirds is not None and len(thirds) == 8
+    if not complete:
+        return
+    # house template (mirrors site/index.html buildR32)
+    ts = sorted(thirds)
+    ms = []
+    for i, l in enumerate("ABCDEFGH"):
+        ms.append([go[l][0], go[ts[i]][2]])
+    for i, l in enumerate("IJKL"):
+        ms.append([go[l][0], go["ABCD"[i]][1]])
+    for a, b in (("E", "F"), ("G", "H"), ("I", "J"), ("K", "L")):
+        ms.append([go[a][1], go[b][1]])
+    m32 = {}
+    for i, pair in enumerate(ms):
+        for tid in pair:
+            m32[tid] = i + 1
+    for tid in sets["R16"]:
+        if tid not in m32:
+            raise RuntimeError("an R16 pick is not among your 32 qualifiers")
+    div = 1
+    for t in order:
+        seen = set()
+        for tid in sets[t]:
+            idx = -(-m32[tid] // div)  # ceil
+            if idx in seen:
+                raise RuntimeError(f"two {name[t]} picks sit on the same bracket path — only one side of a tie can advance")
+            seen.add(idx)
+        div *= 2
+
 def save(player, picks):
     prow = get_player(player)
     if not prow:
         raise RuntimeError(f"player '{player}' not found in PoolPlayers (run create_base.py seed)")
     player_rec = prow["id"]
-    team_map = {int(r["fields"]["team_id"]): r["id"]
-                for r in at_list("Teams", fields=["team_id"]) if r["fields"].get("team_id") is not None}
+    team_map, teams_by_code = {}, {}
+    for r in at_list("Teams", fields=["team_id", "code", "group"]):
+        f = r["fields"]
+        if f.get("team_id") is None:
+            continue
+        team_map[int(f["team_id"])] = r["id"]
+        if f.get("code"):
+            teams_by_code[f["code"]] = {"team_id": f["team_id"], "group": f.get("group")}
+    bracket_guard(picks, teams_by_code)   # rejects before anything is written
     sg_map = {r["fields"].get("name"): r["id"] for r in at_list("SideGames", fields=["name"])}
     foot_map = {int(r["fields"]["player_id"]): r["id"]
                 for r in at_list("Footballers", fields=["player_id"]) if r["fields"].get("player_id") is not None}
@@ -235,9 +334,19 @@ def save(player, picks):
                  for r in at_list("Matches", fields=["fixture_id"]) if r["fields"].get("fixture_id") is not None}
     records = [prediction_fields(player, p, team_map, player_rec, sg_map, foot_map, match_map) for p in picks if p.get("key")]
     n = at_upsert("Predictions", records, ["label"]) if records else 0
+    # bracket rows are full-replace: the tree regenerates the complete set every save,
+    # so the player's bracket rows absent from this payload were cleared client-side
+    bracket_types = {"bracket_slot", "bracket_struct"}
+    keep = {f"{player}|{p['key']}" for p in picks if p.get("key") and p.get("type") in bracket_types}
+    all_preds = at_list("Predictions", fields=["label", "prediction_type", "confidence_token"])
+    doomed = [r["id"] for r in all_preds
+              if r.get("fields", {}).get("label", "").startswith(player + "|")
+              and r["fields"].get("prediction_type") in bracket_types
+              and r["fields"].get("label") not in keep]
+    deleted = at_delete("Predictions", doomed) if doomed else 0
     used = token_counts(picks)
     # bonus bets live outside this payload (saved via /api/savebonus) but share the budget
-    for r in at_list("Predictions", fields=["label", "prediction_type", "confidence_token"]):
+    for r in all_preds:
         f = r.get("fields", {})
         if (f.get("label", "").startswith(player + "|") and f.get("prediction_type") == "bonus_bet"
                 and f.get("confidence_token") in used):
@@ -246,7 +355,7 @@ def save(player, picks):
         "tokens_remaining_double": START_TOKENS["Double"] - used["Double"],
         "tokens_remaining_triple": START_TOKENS["Triple"] - used["Triple"],
         "tokens_remaining_allin": START_TOKENS["AllIn"] - used["AllIn"]}}]})
-    return {"saved": n, "tokensUsed": used}
+    return {"saved": n, "deleted": deleted, "tokensUsed": used}
 
 def at_delete(table, ids):
     n = 0

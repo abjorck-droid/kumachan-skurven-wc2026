@@ -133,6 +133,84 @@ async function atListByIds(env, table, ids, fields) {
   return out;
 }
 
+// ---- propagated-bracket validation ------------------------------------------
+// The pick-entry tree guarantees coherent picks, but the API doesn't trust clients.
+// Set-level rules always apply (no duplicates in a round, rounds nest, size caps).
+// When the generating structure is COMPLETE (12 group orders + 8 thirds) we also
+// rebuild the house-template R32 and reject picks outside it or two picks that sit
+// on the same bracket path (the "both sides of one tie" hedge the tree forbids).
+// Partial structure = a mid-edit save → set-level checks only. No structure at all
+// (legacy payload) is likewise allowed through on set-level checks.
+function bracketGuard(picks, teamsByCode) {
+  const TIER = (k) => k === "Champion" ? "C" : /^F-\d+$/.test(k) ? "F" : /^SF-\d+$/.test(k) ? "SF"
+    : /^QF-\d+$/.test(k) ? "QF" : /^R16-\d+$/.test(k) ? "R16" : null;
+  const ORDER = ["R16", "QF", "SF", "F", "C"];
+  const MAX = { R16: 16, QF: 8, SF: 4, F: 2, C: 1 };
+  const NAME = { R16: "Round-of-16", QF: "quarter-final", SF: "semi-final", F: "finalist", C: "champion" };
+  const sets = { R16: new Set(), QF: new Set(), SF: new Set(), F: new Set(), C: new Set() };
+  const go = {};
+  let thirds = null;
+  for (const p of picks || []) {
+    if (!p) continue;
+    const k = p.bracket_slot || p.key;
+    if (p.type === "bracket_slot") {
+      const t = TIER(k);
+      if (!t) throw httpErr(`unknown bracket slot '${k}'`, 400);
+      if (p.team_id == null || p.team_id === "") continue;        // token/note-only rows hold no team
+      const id = String(parseInt(p.team_id));
+      if (sets[t].has(id)) throw httpErr(`duplicate team in your ${NAME[t]} round`, 400);
+      sets[t].add(id);
+    } else if (p.type === "bracket_struct") {
+      let m;
+      if ((m = /^group_order\|([A-L])$/.exec(k))) {
+        const codes = String(p.player_text || "").split(",").map((s) => s.trim()).filter(Boolean);
+        if (codes.length !== 3 || new Set(codes).size !== 3)
+          throw httpErr(`group_order|${m[1]} needs exactly 3 distinct team codes`, 400);
+        for (const c of codes) {
+          const t = teamsByCode[c];
+          if (!t) throw httpErr(`unknown team code '${c}' in group_order|${m[1]}`, 400);
+          if (t.group !== m[1]) throw httpErr(`${c} is not in group ${m[1]}`, 400);
+        }
+        go[m[1]] = codes.map((c) => String(teamsByCode[c].team_id));
+      } else if (k === "thirds_advance") {
+        const ls = String(p.player_text || "").split(",").map((s) => s.trim()).filter(Boolean);
+        if (ls.length > 8 || new Set(ls).size !== ls.length || ls.some((l) => !/^[A-L]$/.test(l)))
+          throw httpErr("thirds_advance must be up to 8 distinct group letters A–L", 400);
+        thirds = ls;
+      } else throw httpErr(`unknown bracket_struct key '${k}'`, 400);
+    }
+  }
+  for (const t of ORDER)
+    if (sets[t].size > MAX[t]) throw httpErr(`too many ${NAME[t]} picks (${sets[t].size}/${MAX[t]})`, 400);
+  for (let i = ORDER.length - 1; i > 0; i--)
+    for (const id of sets[ORDER[i]])
+      if (!sets[ORDER[i - 1]].has(id))
+        throw httpErr(`bracket not nested: a ${NAME[ORDER[i]]} pick is missing from your ${NAME[ORDER[i - 1]]} round`, 400);
+  const complete = "ABCDEFGHIJKL".split("").every((g) => go[g]) && thirds && thirds.length === 8;
+  if (!complete) return;
+  // house template (mirrors site/index.html buildR32): W A–H v thirds in letter
+  // order, W I–L v RU A–D, RU E..L pair off E-F G-H I-J K-L.
+  const T = thirds.slice().sort();
+  const ms = [];
+  "ABCDEFGH".split("").forEach((l, i) => ms.push([go[l][0], go[T[i]][2]]));
+  "IJKL".split("").forEach((l, i) => ms.push([go[l][0], go["ABCD"[i]][1]]));
+  [["E", "F"], ["G", "H"], ["I", "J"], ["K", "L"]].forEach((p) => ms.push([go[p[0]][1], go[p[1]][1]]));
+  const m32 = {};
+  ms.forEach((pair, i) => pair.forEach((id) => { m32[id] = i + 1; }));
+  for (const id of sets.R16)
+    if (m32[id] == null) throw httpErr("an R16 pick is not among your 32 qualifiers", 400);
+  let div = 1;
+  for (const t of ORDER) {
+    const seen = {};
+    for (const id of sets[t]) {
+      const idx = Math.ceil(m32[id] / div);
+      if (seen[idx]) throw httpErr(`two ${NAME[t]} picks sit on the same bracket path — only one side of a tie can advance`, 400);
+      seen[idx] = 1;
+    }
+    div *= 2;
+  }
+}
+
 // ---- auth ------------------------------------------------------------------
 async function playerByToken(env, token) {
   if (!token) return null;
@@ -234,9 +312,13 @@ async function bootstrap(env, prow) {
 async function save(env, prow, picks) {
   const playerName = (prow.fields || {}).name;
   const playerRec = prow.id;
-  const teamMap = {};
-  for (const r of await atList(env, "Teams", ["team_id"]))
-    if (r.fields.team_id != null) teamMap[parseInt(r.fields.team_id)] = r.id;
+  const teamMap = {}, teamsByCode = {};
+  for (const r of await atList(env, "Teams", ["team_id", "code", "group"]))
+    if (r.fields.team_id != null) {
+      teamMap[parseInt(r.fields.team_id)] = r.id;
+      if (r.fields.code) teamsByCode[r.fields.code] = { team_id: r.fields.team_id, group: r.fields.group };
+    }
+  bracketGuard(picks, teamsByCode);   // 400s before anything is written
   const sgMap = {};
   for (const r of await atList(env, "SideGames", ["name"])) sgMap[r.fields.name] = r.id;
   const footMap = {};
@@ -251,11 +333,25 @@ async function save(env, prow, picks) {
     .map((p) => predictionFields(playerName, p, teamMap, playerRec, sgMap, footMap, matchMap));
   const n = records.length ? await atUpsert(env, "Predictions", records, ["label"]) : 0;
 
+  // Bracket rows are FULL-REPLACE (the tree regenerates the complete set every save):
+  // any of the player's bracket_slot / bracket_struct rows absent from this payload
+  // were cleared client-side — delete them so cascades and wipes actually stick.
+  const BRACKET_TYPES = new Set(["bracket_slot", "bracket_struct"]);
+  const keep = new Set((picks || []).filter((p) => p && p.key && BRACKET_TYPES.has(p.type))
+    .map((p) => `${playerName}|${p.key}`));
+  const allPreds = await atList(env, "Predictions", ["label", "prediction_type", "confidence_token"]);
+  const doomed = allPreds.filter((r) => {
+    const f = r.fields || {};
+    return (f.label || "").startsWith(playerName + "|") &&
+      BRACKET_TYPES.has(f.prediction_type) && !keep.has(f.label);
+  }).map((r) => r.id);
+  const deleted = doomed.length ? await atDelete(env, "Predictions", doomed) : 0;
+
   const used = { Double: 0, Triple: 0, AllIn: 0 };
   for (const p of picks || []) if (used[p.token] != null) used[p.token]++;
   // Bonus bets live outside this payload (saved via /api/savebonus) but share the
   // same 7-token budget — count their tokens too before writing the reserves.
-  for (const r of await atList(env, "Predictions", ["label", "prediction_type", "confidence_token"])) {
+  for (const r of allPreds) {
     const f = r.fields || {};
     if ((f.label || "").startsWith(playerName + "|") && f.prediction_type === "bonus_bet" &&
         used[f.confidence_token] != null) used[f.confidence_token]++;
@@ -267,7 +363,7 @@ async function save(env, prow, picks) {
       tokens_remaining_allin: START_TOKENS.AllIn - used.AllIn,
     } }],
   });
-  return { saved: n, tokensUsed: used };
+  return { saved: n, deleted, tokensUsed: used };
 }
 
 // ---- per-match bonus bets ---------------------------------------------------

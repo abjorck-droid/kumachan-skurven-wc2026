@@ -81,6 +81,40 @@
   .banner.err{display:block;background:rgba(255,90,90,.12);color:var(--bad);border:1px solid rgba(255,90,90,.4)}
   .hint{font-size:12px;color:var(--text-mute);margin-top:6px}
   .loading{padding:60px 0;text-align:center;color:var(--text-dim);font-family:'Antonio',sans-serif;letter-spacing:.1em;text-transform:uppercase}
+
+  /* propagated bracket: group-order cards */
+  .gocards{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px}
+  .gocard{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:10px 12px}
+  .gohead{font-family:'Antonio',sans-serif;font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin-bottom:8px;font-weight:500;display:flex;align-items:center;gap:8px}
+  .gohead .ok{color:var(--good)}
+  .goreset{margin-left:auto;background:transparent;border:none;color:var(--text-mute);cursor:pointer;font-size:11px;font-family:'Antonio',sans-serif;letter-spacing:.08em;text-transform:uppercase}
+  .goreset:hover{color:var(--text-dim)}
+  .goteam{display:flex;align-items:center;gap:8px;width:100%;text-align:left;background:var(--card-soft);border:1px solid var(--border);border-radius:5px;color:var(--text);font-family:'Inter',sans-serif;font-size:13px;padding:7px 9px;margin-bottom:5px;cursor:pointer}
+  .goteam:hover{border-color:var(--border-strong)}
+  .goteam .gobadge{flex:0 0 18px;height:18px;border-radius:50%;font-family:'Antonio',sans-serif;font-size:11px;font-weight:700;line-height:18px;text-align:center;background:transparent;border:1px dashed var(--border-strong);color:var(--text-mute)}
+  .goteam.ranked .gobadge{border-style:solid;background:var(--accent);border-color:var(--accent);color:#fff}
+  .goteam.ranked.r3 .gobadge{background:var(--gold);border-color:var(--gold);color:#1a1500}
+  .goteam.ranked{border-color:var(--border-strong)}
+  .goname{color:var(--text-dim);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+  /* best thirds */
+  .thirds{display:flex;flex-wrap:wrap;gap:8px}
+  .tchip{display:inline-flex;align-items:center;gap:6px;background:var(--card-soft);border:1px solid var(--border-strong);border-radius:6px;color:var(--text);font-family:'Inter',sans-serif;font-size:13px;padding:7px 11px;cursor:pointer}
+  .tchip.on{background:var(--gold-soft);border-color:rgba(232,185,72,.55);color:var(--gold)}
+  .tchip.on .goname{color:var(--gold)}
+
+  /* bracket match rows */
+  .row.brow{grid-template-columns:74px 1fr 122px}
+  .bchips{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+  .bvs{color:var(--text-mute);font-family:'Antonio',sans-serif;font-size:11px}
+  .bchip{display:inline-flex;align-items:center;gap:6px;background:var(--card-soft);border:1px solid var(--border-strong);border-radius:6px;color:var(--text);font-family:'Inter',sans-serif;font-size:13px;padding:7px 10px;cursor:pointer;max-width:230px}
+  .bchip:hover{border-color:var(--andreas)}
+  .bchip.on{background:var(--andreas-soft);border-color:var(--andreas);color:var(--text)}
+  .bchip.on:hover{border-color:var(--bad)}
+  .bchip.ghost{border-style:dashed;color:var(--text-mute);cursor:default;background:transparent}
+  .bsrc{font-family:'Antonio',sans-serif;font-size:10px;letter-spacing:.06em;color:var(--text-mute);border:1px solid var(--border);border-radius:3px;padding:1px 4px}
+  .bchip.on .bsrc{color:var(--andreas);border-color:rgba(33,158,188,.4)}
+  .bgate{padding:18px;border:1px dashed var(--border-strong);border-radius:8px;color:var(--text-dim);font-size:13px;line-height:1.6}
 </style>
 </head>
 <body>
@@ -127,48 +161,72 @@ function matchStarted(m){
   if(m.status && m.status!=="Scheduled") return true;
   return !!(m.kickoff && new Date(m.kickoff) <= new Date());
 }
-// bracket round of a slot key — used for the duplicate guard + coherence warnings
-function tierOfKey(key){
-  if(key==="Champion") return "Champion";
-  if(key.indexOf("F-")===0) return "Finalist";
-  if(key.indexOf("SF-")===0) return "SF";
-  if(key.indexOf("QF-")===0) return "QF";
-  if(key.indexOf("R16-")===0) return "R16";
-  return null;
-}
-var TIER_LABEL={Champion:"Champion",Finalist:"Finalists",SF:"Semi-finalists",QF:"Quarter-finalists",R16:"Round of 16"};
-function bracketWarnings(){
-  // non-blocking coherence checks (pool rule: duplicates are hard-blocked separately)
-  var tiers={R16:[],QF:[],SF:[],Finalist:[],Champion:[]};
-  Object.keys(META).forEach(function(k){
-    if(META[k].type!=="bracket_slot") return;
-    var t=tierOfKey(k), v=(VALUES[k]||{}).team_id;
-    if(t&&v) tiers[t].push(String(v));
-  });
-  var teamOf=function(id){ return (DATA.teams||[]).filter(function(x){return String(x.id)===String(id);})[0]||{}; };
-  var warn=[];
-  var byGroup={};
-  tiers.R16.forEach(function(id){ var g=teamOf(id).group; if(g) byGroup[g]=(byGroup[g]||0)+1; });
-  Object.keys(byGroup).forEach(function(g){
-    if(byGroup[g]>3) warn.push("Group "+g+": "+byGroup[g]+" teams in your Round of 16 — only 3 can survive a group");
-  });
-  [["Champion","Finalist"],["Finalist","SF"],["SF","QF"],["QF","R16"]].forEach(function(pair){
-    tiers[pair[0]].forEach(function(id){
-      if(tiers[pair[1]].indexOf(id)<0)
-        warn.push((teamOf(id).code||teamOf(id).name||"A team")+" is in your "+TIER_LABEL[pair[0]]+
-          " but not your "+TIER_LABEL[pair[1]]+" — that leaves points on the table");
-    });
-  });
-  return warn;
-}
-
-const BRACKET = [
-  {title:"Champion", pts:"150 pts", slots:[["Champion","Champion"]]},
-  {title:"Finalists", pts:"40 pts each", slots:[["F-1","Finalist 1"],["F-2","Finalist 2"]]},
-  {title:"Semi-finalists", pts:"20 pts each", slots:[1,2,3,4].map(i=>["SF-"+i,"Semi-finalist "+i])},
-  {title:"Quarter-finalists", pts:"10 pts each", slots:[1,2,3,4,5,6,7,8].map(i=>["QF-"+i,"Quarter-finalist "+i])},
-  {title:"Round of 16", pts:"5 pts each", slots:Array.from({length:16},(_,i)=>["R16-"+(i+1),"R16 team "+(i+1)])},
+// ---- propagated bracket -----------------------------------------------------
+// The bracket is GENERATED from group-stage calls: order each group 1-2-3, choose
+// which 8 thirds advance, then advance teams match by match to the title. Storage
+// stays the spec's order-free sets — slot keys R16-1..16 / QF-1..8 / SF-1..4 /
+// F-1..2 / Champion — plus 13 unscored "bracket_struct" rows (group_order|A..L,
+// thirds_advance) that persist the generating structure. Scoring is untouched:
+// the engine pays sets per round and ignores bracket_struct entirely.
+const ROUNDS = [
+  {key:"R32", label:"Round of 32", n:16, prefix:"R16-",     pts:5,   slotName:"R16 berth"},
+  {key:"R16", label:"Round of 16", n:8,  prefix:"QF-",      pts:10,  slotName:"QF berth"},
+  {key:"QF",  label:"Quarter-finals", n:4, prefix:"SF-",    pts:20,  slotName:"SF berth"},
+  {key:"SF",  label:"Semi-finals", n:2,  prefix:"F-",       pts:40,  slotName:"Final berth"},
+  {key:"F",   label:"Final", n:1,        prefix:"Champion", pts:150, slotName:"crown"},
 ];
+function slotKeyOf(ri,idx){ const r=ROUNDS[ri]; return r.prefix==="Champion"?"Champion":r.prefix+idx; }
+const ALL_SLOT_KEYS = ROUNDS.flatMap((r,ri)=>Array.from({length:r.n},(_,i)=>slotKeyOf(ri,i+1)));
+
+// House template for the pre-draw Round of 32 (cosmetic — sets are what score):
+// winners A–H face the eight advancing thirds in group-letter order; winners I–L
+// face runners-up A–D; runners-up E..L pair off E-F, G-H, I-J, K-L.
+function buildR32(go, thirds){
+  const ok = GROUPS.every(g=>(go[g]||[]).length===3) && (thirds||[]).length===8;
+  if(!ok) return null;
+  const t=thirds.slice().sort();
+  const W=l=>({id:String(go[l][0]), src:l+"1"});
+  const RU=l=>({id:String(go[l][1]), src:l+"2"});
+  const TH=l=>({id:String(go[l][2]), src:l+"3"});
+  const ms=[];
+  "ABCDEFGH".split("").forEach((l,i)=>ms.push([W(l),TH(t[i])]));
+  "IJKL".split("").forEach((l,i)=>ms.push([W(l),RU("ABCD"[i])]));
+  [["E","F"],["G","H"],["I","J"],["K","L"]].forEach(p=>ms.push([RU(p[0]),RU(p[1])]));
+  return ms;   // 16 matches; index i = match i+1
+}
+function chainIdx(m32, ri){ let m=m32; for(let i=0;i<ri;i++) m=Math.ceil(m/2); return m; }
+
+// Surgical cascade: re-derive every slot from the team identities currently picked.
+// A team that merely changes position keeps its pick (and token/note); a team that
+// no longer advances drops out everywhere above; if two picks collide on one slot
+// (they now meet earlier), both are voided so the user re-decides that tie.
+function pruneAssign(vals, go, thirds){
+  const ms=buildR32(go,thirds); if(!ms) return null;
+  const m32of={}; ms.forEach((pair,i)=>pair.forEach(s=>m32of[s.id]=i+1));
+  const out={};
+  let inPrev = id => m32of[id]!=null;
+  ROUNDS.forEach((r,ri)=>{
+    const cur={};
+    for(let k=1;k<=r.n;k++){ const v=vals[slotKeyOf(ri,k)]; if(v&&v.team_id) cur[String(v.team_id)]=v; }
+    const byIdx={}, kept={};
+    Object.keys(cur).forEach(id=>{
+      if(!inPrev(id)) return;
+      const idx=chainIdx(m32of[id], ri);
+      byIdx[idx] = (byIdx[idx]===undefined) ? {id} : null;   // collision voids both
+    });
+    Object.keys(byIdx).forEach(idx=>{
+      const e=byIdx[idx]; if(!e) return;
+      const v=cur[e.id]||{};
+      const slot={team_id:e.id};
+      if(v.token) slot.token=v.token;
+      if(v.note) slot.note=v.note;
+      out[slotKeyOf(ri,+idx)]=slot;
+      kept[e.id]=1;
+    });
+    inPrev = id => !!kept[id];
+  });
+  return out;
+}
 // name, points, player-filter ("all" | "gk"), free-text placeholder fallback
 const SIDE_PLAYER = [
   ["Golden Boot",60,"all","Player name"],["Golden Glove",60,"gk","Goalkeeper name"],
@@ -177,6 +235,7 @@ const SIDE_PLAYER = [
 const GROUPS = "ABCDEFGHIJKL".split("");
 
 let DATA = null, META = {}, VALUES = {}, PLAYER = "Andreas", LOCKED = false, ACTIVE_TAB = "matches";
+let BR = {go:{}, thirds:[]};   // bracket-generating structure: group orders (team_ids 1st..3rd) + advancing-third letters
 // Hosted mode: a magic-link token in the URL (?p=…) means the player is fixed by their link.
 // No token = local-server mode with the Andreas/Cal toggle. Same page serves both.
 const TOKEN = new URLSearchParams(location.search).get("p");
@@ -291,17 +350,142 @@ function kickLabel(iso){
          d.toLocaleTimeString(undefined,{hour:"2-digit",minute:"2-digit"});
 }
 
+// ---- propagated-bracket UI helpers ------------------------------------------
+function teamById(id){ return (DATA.teams||[]).find(t=>String(t.id)===String(id)); }
+function codeOf(id){ const t=teamById(id); return t?t.code:null; }
+function structureComplete(){ return GROUPS.every(g=>(BR.go[g]||[]).length===3) && BR.thirds.length===8; }
+function syncStructValues(){
+  GROUPS.forEach(g=>{
+    const k="group_order|"+g;
+    if((BR.go[g]||[]).length===3) VALUES[k]={player_text: BR.go[g].map(codeOf).join(",")};
+    else delete VALUES[k];
+  });
+  if(BR.thirds.length) VALUES["thirds_advance"]={player_text: BR.thirds.slice().sort().join(",")};
+  else delete VALUES["thirds_advance"];
+}
+function propagateBR(){
+  syncStructValues();
+  const vals={}; ALL_SLOT_KEYS.forEach(k=>{ if(VALUES[k]) vals[k]=VALUES[k]; });
+  const out=pruneAssign(vals, BR.go, BR.thirds);
+  if(out){ ALL_SLOT_KEYS.forEach(k=>delete VALUES[k]); Object.assign(VALUES,out); }
+  // structure incomplete → leave slot picks frozen; the next complete propagate prunes
+}
+function loadStructFromValues(){
+  BR={go:{},thirds:[]}; GROUPS.forEach(g=>BR.go[g]=[]);
+  const codeToId={}; (DATA.teams||[]).forEach(t=>{ if(t.code) codeToId[t.code]=String(t.id); });
+  GROUPS.forEach(g=>{
+    const v=VALUES["group_order|"+g];
+    if(v&&v.player_text){
+      const ids=v.player_text.split(",").map(c=>codeToId[c.trim()]).filter(Boolean)
+        .filter(id=>{ const t=teamById(id); return t&&t.group===g; });
+      if(ids.length===3 && new Set(ids).size===3) BR.go[g]=ids;
+    }
+  });
+  const tv=VALUES["thirds_advance"];
+  if(tv&&tv.player_text){
+    BR.thirds=[...new Set(tv.player_text.split(",").map(s=>s.trim()).filter(l=>GROUPS.includes(l)))].slice(0,8);
+  }
+  if(structureComplete()) propagateBR();
+  else ALL_SLOT_KEYS.forEach(k=>delete VALUES[k]);   // legacy free-form picks: clean slate (agreed 2026-06-09)
+}
+function bracketProgress(){
+  return { groups: GROUPS.filter(g=>(BR.go[g]||[]).length===3).length,
+           thirds: BR.thirds.length,
+           slots: ALL_SLOT_KEYS.filter(k=>(VALUES[k]||{}).team_id).length };
+}
+function bracketMatchRow(target, feeders, r, matchLabel){
+  const v=VALUES[target]||{};
+  const chosen=v.team_id?String(v.team_id):null;
+  const dis=LOCKED?" disabled":"";
+  const chips=feeders.map(f=>{
+    if(!f.id) return `<span class="bchip ghost">${f.src||"—"}</span>`;
+    const t=teamById(f.id)||{};
+    const on=chosen===String(f.id);
+    return `<button class="bchip${on?' on':''}" data-act="adv" data-target="${target}" data-team="${f.id}"${dis}>`+
+      (f.src?`<span class="bsrc">${f.src}</span>`:"")+`${t.code||"?"} <span class="goname">${t.name||""}</span></button>`;
+  }).join('<span class="bvs">v</span>');
+  const extras = chosen ? tokenSelect(target)+noteInput(target) : `<span></span>`;
+  return `<div class="row brow${v.token?' tokened':''}" id="row-${target}">
+    <span class="lab">${matchLabel}</span>
+    <div class="bchips">${chips}</div>
+    ${extras}
+  </div>`;
+}
+function renderKOContent(){
+  GROUPS.forEach(g=>{ META["group_order|"+g]={type:"bracket_struct",bracket_slot:"group_order|"+g}; });
+  META["thirds_advance"]={type:"bracket_struct",bracket_slot:"thirds_advance"};
+  ALL_SLOT_KEYS.forEach(k=>{ META[k]={type:"bracket_slot",bracket_slot:k}; });
+  META["darkhorse"]={type:"dark_horse",side_game:"Dark Horse"};
+  const dis=LOCKED?" disabled":"";
+
+  let h = `<h2>Group finishes</h2><div class="sub">Tap teams in finishing order — 1st, 2nd, 3rd (tap a ranked team to undo from there).
+    Your top two advance automatically; the third joins the best-thirds pool. This is what generates your bracket.</div>`;
+  h += `<div class="gocards">`+GROUPS.map(g=>{
+    const teams=(DATA.teams||[]).filter(t=>t.group===g);
+    const order=BR.go[g]||[];
+    return `<div class="gocard"><div class="gohead">Group ${g}${order.length===3?' <span class="ok">✓</span>':''}`+
+      `<button class="goreset" data-act="goreset" data-group="${g}"${dis}>reset</button></div>`+
+      teams.map(t=>{
+        const ri=order.indexOf(String(t.id));
+        return `<button class="goteam${ri>=0?' ranked r'+(ri+1):''}" data-act="rank" data-group="${g}" data-team="${t.id}"${dis}>`+
+          `<span class="gobadge">${ri>=0?(ri+1):''}</span>${t.code||"?"} <span class="goname">${t.name||""}</span></button>`;
+      }).join("")+`</div>`;
+  }).join("")+`</div>`;
+
+  const thirdTeams=GROUPS.map(g=>(BR.go[g]||[])[2]?{g, team:teamById(BR.go[g][2])||{}}:null);
+  const thirdsReady=thirdTeams.every(Boolean);
+  h += `<h2>Best thirds <span class="pts">· pick 8 of 12</span></h2>`;
+  if(!thirdsReady){
+    h += `<div class="sub">Finish ordering all 12 groups to reveal the third-placed pool.</div>`;
+  } else {
+    h += `<div class="sub">Eight third-placed teams survive into the Round of 32 — ${BR.thirds.length}/8 chosen.
+      A third keeps its slot if the group reshuffles; the team in it just changes with your 3rd-place call.</div><div class="thirds">`+
+      thirdTeams.map(x=>{
+        const on=BR.thirds.includes(x.g);
+        return `<button class="tchip${on?' on':''}" data-act="third" data-letter="${x.g}"${dis}>${x.g}3 · ${x.team.code||"?"} <span class="goname">${x.team.name||""}</span></button>`;
+      }).join("")+`</div>`;
+  }
+
+  h += `<h2>Bracket <span class="pts">· advance teams to the crown</span></h2>`;
+  const ms=buildR32(BR.go,BR.thirds);
+  if(!ms){
+    const p=bracketProgress();
+    h += `<div class="bgate">The bracket builds itself once the group stage is called — <b>${p.groups}/12 groups ordered, ${p.thirds}/8 thirds chosen</b>.
+      Then you advance teams round by round to a champion.</div>`;
+  } else {
+    h += `<div class="sub">Tap the team that wins each tie. Pairings use a fixed house template until the real draw exists —
+      scoring only counts <b>which teams reach each round</b>, so the matchups are scaffolding, not picks.
+      Changing a group finish keeps every surviving pick (tokens ride along); only teams that drop out are cleared.</div>`;
+    ROUNDS.forEach((r,ri)=>{
+      h += `<div class="grp-label">${r.label} <span style="color:var(--text-mute)">· winner takes ${r.prefix==="Champion"?"the crown":"a "+r.slotName} · ${r.pts} pts</span></div>`;
+      for(let k=1;k<=r.n;k++){
+        const target=slotKeyOf(ri,k);
+        const feeders = ri===0
+          ? ms[k-1].map(s=>({id:s.id, src:s.src}))
+          : [2*k-1,2*k].map(j=>{
+              const pv=VALUES[slotKeyOf(ri-1,j)];
+              return (pv&&pv.team_id) ? {id:String(pv.team_id), src:null}
+                                      : {id:null, src:ROUNDS[ri-1].key+" M"+j+" winner"};
+            });
+        h += bracketMatchRow(target, feeders, r, r.n===1?"Final":r.key+" M"+k);
+      }
+    });
+  }
+
+  h += `<h2>Dark Horse <span class="pts">· ladder up to 1000 pts</span></h2><div class="sub">One team, ranked outside the FIFA top 16 at lock. The spiciest pick in the game — an All-In here is the boldest move available. Independent of the bracket above.</div>`;
+  h += teamRow("darkhorse","Dark Horse");
+  return h;
+}
+function renderKOPanel(){
+  const p=document.querySelector('.tabpanel[data-tab="ko"]');
+  if(p) p.innerHTML=renderKOContent();
+  updateReserves(); updateSummary();
+}
+
 function render(){
   META = {};
-  // --- Knockouts panel: bracket-slot ladder + Dark Horse ---
-  let ko = `<h2>Bracket ladder</h2><div class="sub">Name the teams you think reach each knockout round — independent of who they actually play. Stacks with your group-match picks.</div>`;
-  BRACKET.forEach(g=>{
-    ko += `<div class="grp-label">${g.title} <span style="color:var(--text-mute)">· ${g.pts}</span></div>`;
-    g.slots.forEach(([key,label])=>{ META[key]={type:"bracket_slot",bracket_slot:key}; ko += teamRow(key,label); });
-  });
-  ko += `<h2>Dark Horse <span class="pts">· ladder up to 1000 pts</span></h2><div class="sub">One team, ranked outside the FIFA top 16 at lock. The spiciest pick in the game — an All-In here is the boldest move available.</div>`;
-  META["darkhorse"]={type:"dark_horse",side_game:"Dark Horse"};
-  ko += teamRow("darkhorse","Dark Horse");
+  // --- Knockouts panel: propagated bracket + Dark Horse ---
+  const ko = renderKOContent();
 
   // --- Group matches panel (bootstrap now returns ALL fixtures; filter to group rounds) ---
   let mk = "";
@@ -391,7 +575,7 @@ function hasVal(v){ return !!(v && (v.team_id||v.player_id||v.player_text||v.out
 function tabOf(key){
   if(key.startsWith("match|")) return "matches";
   if(key.startsWith("bonus|")) return "bonus";
-  if(key==="darkhorse"||(META[key]&&META[key].type==="bracket_slot")) return "ko";
+  if(key==="darkhorse"||(META[key]&&(META[key].type==="bracket_slot"||META[key].type==="bracket_struct"))) return "ko";
   if(key.startsWith("side|")) return "side";
   return null;
 }
@@ -421,34 +605,22 @@ function updateSummary(){
     <span>Double <b>${used.Double}/4</b></span><span>Triple <b>${used.Triple}/2</b></span><span>All-In <b>${used.AllIn}/1</b></span>`;
   const cw=$("#coherence");
   if(cw){
-    const w=bracketWarnings();
-    cw.innerHTML = w.length
-      ? `<div class="warnbox"><b>⚠ Bracket coherence — ${w.length} thing${w.length===1?"":"s"} to look at (won't block locking)</b><ul>`+
-        w.map(x=>`<li>${x}</li>`).join("")+`</ul></div>`
-      : `<div class="okline">Bracket coherence ✓ no issues</div>`;
+    // The propagated tree can't produce an incoherent bracket — completeness is the only thing to check.
+    const p=bracketProgress(), missing=[];
+    if(p.groups<12) missing.push(`order ${12-p.groups} more group${12-p.groups===1?"":"s"}`);
+    if(p.thirds<8) missing.push(`choose ${8-p.thirds} more advancing third${8-p.thirds===1?"":"s"}`);
+    if(p.groups===12&&p.thirds===8&&p.slots<31) missing.push(`advance ${31-p.slots} more bracket slot${31-p.slots===1?"":"s"} (ties without a winner score nothing)`);
+    cw.innerHTML = missing.length
+      ? `<div class="warnbox"><b>⚠ Bracket incomplete (won't block locking)</b><ul>`+
+        missing.map(x=>`<li>${x}</li>`).join("")+`</ul></div>`
+      : `<div class="okline">Bracket complete ✓ 12 groups · 8 thirds · 31 slots</div>`;
   }
 }
 
 function onChange(e){
   const key=e.target.dataset.key, role=e.target.dataset.role; if(!key||LOCKED) return;
   VALUES[key] = VALUES[key] || {};
-  if(role==="team"){
-    var newTeam = e.target.value || undefined;
-    var myTier = META[key] && META[key].type==="bracket_slot" ? tierOfKey(key) : null;
-    if(newTeam && myTier){
-      // pool rule: a team can hold at most one slot per round (duplicates are void anyway)
-      var dupe = Object.keys(META).some(function(k){
-        return k!==key && META[k].type==="bracket_slot" && tierOfKey(k)===myTier &&
-               String((VALUES[k]||{}).team_id||"")===String(newTeam);
-      });
-      if(dupe){
-        e.target.value = VALUES[key].team_id || "";
-        flash("Already picked in "+(TIER_LABEL[myTier]||myTier)+" — one slot per team per round");
-        return;
-      }
-    }
-    VALUES[key].team_id = newTeam;
-  }
+  if(role==="team"){ VALUES[key].team_id = e.target.value || undefined; }   // bracket slots are tree-generated now; this only serves Dark Horse
   else if(role==="player"){ VALUES[key].player_id = e.target.value || undefined; }
   else if(role==="text"){ VALUES[key].player_text = e.target.value || undefined; }
   else if(role==="outcome"){ VALUES[key].outcome = e.target.value || undefined; }
@@ -580,16 +752,44 @@ async function loadPlayer(player){
       scalar:(p.scalar!=null?p.scalar:undefined),
       bet_type:p.bet_type||undefined, bet_value:p.bet_value||undefined,
       token:p.token||undefined, note:p.note||undefined }; });
+    loadStructFromValues();   // rebuild group orders + thirds + pruned slots from saved structure
     render();
   }catch(err){ $("#app").innerHTML=""; showErr("Couldn't load — is the base built & server running? ("+err.message+")"); }
 }
 
 $("#app").addEventListener("change", onChange);
 $("#app").addEventListener("input", e=>{ if(["text","note","scalar","score_home","score_away"].includes(e.target.dataset.role)) onChange(e); });
+function onBracketAct(b){
+  const act=b.dataset.act;
+  if(act==="rank"){
+    const g=b.dataset.group, id=String(b.dataset.team);
+    const o=BR.go[g]||(BR.go[g]=[]);
+    const i=o.indexOf(id);
+    if(i>=0) o.splice(i);                       // undo this rank and everything after it
+    else if(o.length<3) o.push(id);
+    else return flash("Group "+g+" is set — tap a ranked team to undo first");
+  }
+  else if(act==="goreset"){ BR.go[b.dataset.group]=[]; }
+  else if(act==="third"){
+    const l=b.dataset.letter, i=BR.thirds.indexOf(l);
+    if(i>=0) BR.thirds.splice(i,1);
+    else if(BR.thirds.length<8) BR.thirds.push(l);
+    else return flash("Eight thirds max — deselect one first");
+  }
+  else if(act==="adv"){
+    const k=b.dataset.target, id=String(b.dataset.team);
+    if(String((VALUES[k]||{}).team_id||"")===id) delete VALUES[k];   // deselect → drops out upstream too
+    else VALUES[k]={team_id:id};                                     // radio per tie; token/note start fresh
+  }
+  else return;
+  propagateBR(); renderKOPanel();
+}
 document.addEventListener("click", e=>{
   if(e.target.id==="saveBtn") save();
   if(e.target.id==="bonusSaveBtn") saveBonusBets();
   if(e.target.id==="lockBtn") lockBracket();
+  const ab=e.target.closest && e.target.closest("[data-act]");
+  if(ab && !LOCKED) onBracketAct(ab);
   const tb=e.target.closest && e.target.closest("#tabs button");
   if(tb){ setTab(tb.dataset.tab); }
   if(e.target.dataset.player){
@@ -597,6 +797,14 @@ document.addEventListener("click", e=>{
     e.target.classList.add("on"); loadPlayer(e.target.dataset.player);
   }
 });
+// test hooks (stub-DOM suites drive the page through these; harmless in production)
+window.__T = { ROUNDS, ALL_SLOT_KEYS, GROUPS, slotKeyOf, buildR32, chainIdx, pruneAssign,
+  structureComplete, syncStructValues, propagateBR, loadStructFromValues, bracketProgress,
+  renderKOContent, collectPicks, onBracketAct, countTokens,
+  set(o){ if(o.DATA!==undefined)DATA=o.DATA; if(o.VALUES!==undefined)VALUES=o.VALUES;
+          if(o.BR!==undefined)BR=o.BR; if(o.META!==undefined)META=o.META; if(o.LOCKED!==undefined)LOCKED=o.LOCKED; },
+  get(){ return {DATA,VALUES,BR,META,LOCKED}; } };
+
 const LOCAL = location.hostname==="127.0.0.1" || location.hostname==="localhost";
 if(TOKEN){ $("#playerSeg").style.display="none"; loadPlayer(); }
 else if(!LOCAL){ $("#playerSeg").style.display="none";
