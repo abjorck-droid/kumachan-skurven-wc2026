@@ -646,7 +646,7 @@ function groupConsistencyWarning(g){
     const A=pts[ranked[hi]], B=pts[ranked[lo]];
     if(B && A && B.min>A.max){
       const bp=B.min===B.max?`${B.min} pts`:`at least ${B.min} pts`;
-      return `Hey buddy, you sure? Your match picks give ${B.name} ${bp}, but you placed them ${ord[lo]} — behind ${A.name}, who can reach at most ${A.max}. One of the two needs to change.`;
+      return `Hey buddy, you sure 'bout this? Your match picks give ${B.name} ${bp}, but you placed them ${ord[lo]} — behind ${A.name}, who can reach at most ${A.max}. One of the two needs to change.`;
     }
   }
   return null;
