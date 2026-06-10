@@ -105,8 +105,10 @@ These stack with per-match outcome picks — they're independent. (Predicting a 
 |---|---|
 | **Golden Boot** (top scorer of tournament) | **60 points** |
 | **Golden Glove** (best goalkeeper — most clean sheets among GKs reaching at least the QF) | **60 points** |
-| **First red card of the tournament** (name the player) | **30 points** |
-| **First own goal of the tournament** (name the player) | **40 points** |
+| **First red card of the tournament** (name the team whose player is sent off) | **30 points** |
+| **First own goal of the tournament** (name the team whose player scores it) | **40 points** |
+
+*Amended 2026-06-10 (pre-lock, agreed): red card and own goal were player picks in v1.0 — naming the exact player was judged too hard. Now team picks; points unchanged.*
 | **Total tournament goals** (closest without going over) | **30 points** |
 | **Top scorer of each group** (12 awards, one per group) | **15 points each** (max 180) |
 | **Dark Horse** | Ladder, see below |

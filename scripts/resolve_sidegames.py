@@ -6,10 +6,12 @@ Airtable-only (no API-Football key needed): everything derives from Matches.even
 (stored by the poller), match scores/status, Teams.group, and Footballers names.
 
 What it resolves, and when:
-  First Red Card         — earliest red-card event (straight red or second yellow), once its
+  First Red Card (team)  — earliest red-card event (straight red or second yellow), once its
                            match is Finished AND every match kicking off at/before it is
                            Finished (VAR-safe; handles simultaneous kickoffs).
-  First Own Goal         — same finality rule; first event with detail "Own Goal".
+  First Own Goal (team)  — same finality rule; first event with detail "Own Goal". Resolves
+                           to the team whose player scored it (API-Football tags the event
+                           with the benefiting team; we attribute the fixture's other side).
   Top Scorer Group A–L   — once all of that group's fixtures are Finished. Goals only —
                            own goals and missed penalties excluded. Ties → joint winners.
   Golden Boot            — once the Final is Finished. Most goals across the tournament;
@@ -201,19 +203,26 @@ def total_goals(match_rows):
     return tot
 
 
-def compute_resolutions(match_rows, events, team_group, canonical_names):
+def compute_resolutions(match_rows, events, team_group, canonical_names, team_names):
     """-> {side_game_name: resolved_value} for everything resolvable right now."""
     out = {}
     fdone = final_is_done(match_rows)
+    fx = {m["fixture_id"]: m for m in match_rows}
 
+    # 2026-06-10: First Red Card / First Own Goal are TEAM bets now (player picks were too hard).
+    # Red card: the carded player's team — API-Football tags card events with that team directly.
     red = first_final_event([e for e in events if is_red_card(e)], match_rows)
-    if red and (red["player_id"] is not None or red["player_name"]):
-        out["First Red Card"] = (canonical_names.get(red["player_id"])
-                                 or red["player_name"] or f"player {red['player_id']}")
+    if red and red.get("team_id") is not None:
+        out["First Red Card"] = team_names.get(red["team_id"]) or f"team {red['team_id']}"
+    # Own goal: the team whose player scored it. API-Football tags own-goal events with the
+    # BENEFITING team, so the offender is the other side of that fixture.
     og = first_final_event([e for e in events if is_own_goal(e)], match_rows)
-    if og and (og["player_id"] is not None or og["player_name"]):
-        out["First Own Goal"] = (canonical_names.get(og["player_id"])
-                                 or og["player_name"] or f"player {og['player_id']}")
+    if og and og.get("team_id") is not None:
+        m = fx.get(og["fixture_id"]) or {}
+        h, a = m.get("home_id"), m.get("away_id")
+        tid = a if og["team_id"] == h else h if og["team_id"] == a else None
+        if tid is not None:
+            out["First Own Goal"] = team_names.get(tid) or f"team {tid}"
 
     for g in GROUPS:
         fids = group_fixture_ids(match_rows, g, team_group)
@@ -310,12 +319,14 @@ def main():
     pat, base = load_keys()
     print(f"resolve_sidegames{'  · DRY RUN' if args.dry_run else ''}")
 
-    teams = at_list(base, "Teams", pat, fields=["team_id", "group"])
-    team_group = {}
+    teams = at_list(base, "Teams", pat, fields=["team_id", "group", "name"])
+    team_group, team_names = {}, {}
     for r in teams:
         f = r.get("fields", {})
         if f.get("team_id") is not None and f.get("group"):
             team_group[f["team_id"]] = f["group"]
+        if f.get("team_id") is not None and f.get("name"):
+            team_names[f["team_id"]] = f["name"]
 
     rec2tid = {r["id"]: r.get("fields", {}).get("team_id") for r in teams}
     match_rows = []
@@ -341,7 +352,7 @@ def main():
             canonical_names[f["player_id"]] = f["name"]
 
     events = parse_events(match_rows)
-    proposals = compute_resolutions(match_rows, events, team_group, canonical_names)
+    proposals = compute_resolutions(match_rows, events, team_group, canonical_names, team_names)
 
     sgs = at_list(base, "SideGames", pat, fields=["name", "resolved_value"])
     now = dt.datetime.utcnow().replace(microsecond=0).isoformat() + "Z"

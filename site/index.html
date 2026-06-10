@@ -232,7 +232,10 @@ function pruneAssign(vals, go, thirds){
 // name, points, player-filter ("all" | "gk"), free-text placeholder fallback
 const SIDE_PLAYER = [
   ["Golden Boot",60,"all","Player name"],["Golden Glove",60,"gk","Goalkeeper name"],
-  ["First Red Card",30,"all","Player name"],["First Own Goal",40,"all","Player name"],
+];
+// team-pick side bets (2026-06-10: changed from player picks — naming the exact player was too hard)
+const SIDE_TEAM = [
+  ["First Red Card",30],["First Own Goal",40],
 ];
 const GROUPS = "ABCDEFGHIJKL".split("");
 
@@ -551,6 +554,8 @@ function render(){
   let sb = `<h2>Side bets</h2><div class="sub">${sgSub}</div>`;
   SIDE_PLAYER.forEach(([name,pts,filter,ph])=>{ const key="side|"+name; META[key]={type:"side_game",side_game:name};
     sb += playerRow(key, `${name} · ${pts}`, filter, ph); });
+  SIDE_TEAM.forEach(([name,pts])=>{ const key="side|"+name; META[key]={type:"side_game",side_game:name};
+    sb += teamRow(key, `${name} · ${pts}`); });
   { const key="side|Total Tournament Goals"; META[key]={type:"side_game",side_game:"Total Tournament Goals"};
     sb += numRow(key,"Total Goals · 30"); }
   sb += `<div class="grp-label">Per-group top scorer · 15 pts each</div>`;

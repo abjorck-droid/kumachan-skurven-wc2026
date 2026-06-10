@@ -1065,7 +1065,7 @@ function demoData(){
   var sideGames=[
     {name:"Golden Boot",base_points:60,resolution_type:"player",resolved_value:null},
     {name:"Total Tournament Goals",base_points:30,resolution_type:"scalar",resolved_value:null},
-    {name:"First Red Card",base_points:30,resolution_type:"event_player",resolved_value:"J. Ramírez (MEX)"},
+    {name:"First Red Card",base_points:30,resolution_type:"team",resolved_value:"Mexico"},
     {name:"Dark Horse",base_points:0,resolution_type:"team",dark_horse_ladder:'{"R32":25,"R16":75,"QF":200,"SF":500,"Final":1000}'},
     {name:"Top Scorer Group A",base_points:15,resolution_type:"player",resolved_value:null},
   ];
@@ -1082,7 +1082,7 @@ function demoData(){
     {key:"match|103",type:"match_outcome",match_id:103,outcome:"Away",score_home:0,score_away:2,has_note:true},
     {key:"side|Golden Boot",type:"side_game",side_game:"Golden Boot",player_name:"E. Haaland"},
     {key:"side|Total Tournament Goals",type:"side_game",side_game:"Total Tournament Goals",scalar:145},
-    {key:"side|First Red Card",type:"side_game",side_game:"First Red Card",text:"S. Ramos Jr.",points:0,resolved:true},
+    {key:"side|First Red Card",type:"side_game",side_game:"First Red Card",team_id:5,points:0,resolved:true},
     {key:"bonus|100|1",type:"bonus_bet",match_id:100,bet_type:"Red card in match",bet_value:"Yes",token:"Triple",points:60,resolved:true,note:"Derby energy."},
     {key:"bonus|102|1",type:"bonus_bet",match_id:102,bet_type:"Over 2.5 goals",bet_value:"No",points:0,resolved:true},
     {key:"bonus|101|1",type:"bonus_bet",match_id:101,bet_type:"Penalty in match",bet_value:"Yes"},
@@ -1099,7 +1099,7 @@ function demoData(){
     {key:"match|104",type:"match_outcome",match_id:104,outcome:"Home"},
     {key:"side|Golden Boot",type:"side_game",side_game:"Golden Boot",player_name:"K. Mbappé"},
     {key:"side|Total Tournament Goals",type:"side_game",side_game:"Total Tournament Goals",scalar:152},
-    {key:"side|First Red Card",type:"side_game",side_game:"First Red Card",text:"J. Ramírez",token:"Double",points:60,resolved:true,note:"He plays angry."},
+    {key:"side|First Red Card",type:"side_game",side_game:"First Red Card",team_id:1,token:"Double",points:60,resolved:true,note:"They play angry."},
     {key:"bonus|100|1",type:"bonus_bet",match_id:100,bet_type:"BTTS",bet_value:"Yes",points:10,resolved:true},
     {key:"bonus|100|2",type:"bonus_bet",match_id:100,bet_type:"Goal in first 15 min",bet_value:"Yes",points:0,resolved:true},
     {key:"bonus|101|1",type:"bonus_bet",match_id:101,bet_type:"Red card in match",bet_value:"No"},
