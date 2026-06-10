@@ -519,7 +519,8 @@ function render(){
     <div class="sub">Attach up to two binary bets to any match before it kicks off — this tab stays open
     even after you lock your main picks. Bets are hidden from your opponent until kickoff, and a match's
     bonus bets only score if <b>both players</b> put at least one bet on it (otherwise void). Tokens welcome —
-    same budget of 7.</div>`;
+    same budget of 7.</div>
+    <div style="margin:10px 0 14px"><button class="btn save bonusSave">Save bonus bets</button></div>`;
   const upcoming = (DATA.matches||[]).filter(m=>!matchStarted(m))
     .slice().sort((a,b)=>(a.kickoff||"").localeCompare(b.kickoff||""));
   if(upcoming.length){
@@ -545,7 +546,7 @@ function render(){
     });
   }
   bn += `<div class="lockbar" style="margin-top:24px">
-    <button class="btn save" id="bonusSaveBtn">Save bonus bets</button>
+    <button class="btn save bonusSave" id="bonusSaveBtn">Save bonus bets</button>
     <div class="hint">Saving replaces all your bonus bets on matches that haven't kicked off. Kicked-off matches can't be changed.</div>
   </div>`;
 
@@ -758,7 +759,8 @@ function collectBonusPicks(){
 }
 
 async function saveBonusBets(){
-  const btn=$("#bonusSaveBtn"), s=$("#status"); if(btn) btn.disabled=true;
+  const btns=[...document.querySelectorAll("button.bonusSave")], s=$("#status");
+  btns.forEach(b=>b.disabled=true);
   s.style.color=""; s.textContent="Saving bonus bets…";
   try{
     const picks=collectBonusPicks();
@@ -767,7 +769,7 @@ async function saveBonusBets(){
     const j=await res.json(); if(!res.ok) throw new Error(j.error||"save failed");
     s.style.color="var(--good)"; s.textContent=`Bonus bets saved ✓ ${j.saved}`;
   }catch(err){ s.style.color="var(--bad)"; s.textContent="Bonus save failed: "+err.message; }
-  finally{ if(btn) btn.disabled=false;
+  finally{ btns.forEach(b=>b.disabled=false);
     setTimeout(()=>{ if($("#status").textContent.startsWith("Bonus bets saved")) $("#status").textContent=""; },3000); }
 }
 
@@ -862,7 +864,7 @@ function onBracketAct(b){
 }
 document.addEventListener("click", e=>{
   if(e.target.id==="saveBtn") save();
-  if(e.target.id==="bonusSaveBtn") saveBonusBets();
+  if(e.target.classList && e.target.classList.contains("bonusSave")) saveBonusBets();
   if(e.target.id==="lockBtn") lockBracket();
   const ab=e.target.closest && e.target.closest("[data-act]");
   if(ab && !LOCKED) onBracketAct(ab);
