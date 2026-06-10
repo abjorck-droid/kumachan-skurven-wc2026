@@ -51,6 +51,8 @@
   .scorebox{display:inline-flex;align-items:center;gap:5px}
   .scorebox input{width:46px;text-align:center;padding:6px 4px}
   .scorebox b{color:var(--text-mute);font-weight:600}
+  .pwrap{display:flex;flex-direction:column;gap:6px}
+  .pwrap .pfind{font-size:13px;padding:6px 10px;color:var(--text-dim)}
 
   /* tab bar (second row of the sticky header) */
   .tabs{max-width:760px;margin:0 auto;padding:0 18px;display:flex;gap:2px;border-top:1px solid var(--border);overflow-x:auto}
@@ -78,7 +80,7 @@
   .btn.lock{background:var(--gold);color:#1a1500}
   .banner{display:none;padding:12px 16px;border-radius:6px;margin:16px 0;font-family:'Antonio',sans-serif;letter-spacing:.06em;text-transform:uppercase;font-size:13px}
   .banner.locked{display:block;background:var(--gold-soft);color:var(--gold);border:1px solid rgba(232,185,72,.4)}
-  .banner.err{display:block;background:rgba(255,90,90,.12);color:var(--bad);border:1px solid rgba(255,90,90,.4)}
+  .banner.err{background:rgba(255,90,90,.12);color:var(--bad);border:1px solid rgba(255,90,90,.4)}
   .hint{font-size:12px;color:var(--text-mute);margin-top:6px}
   .loading{padding:60px 0;text-align:center;color:var(--text-dim);font-family:'Antonio',sans-serif;letter-spacing:.1em;text-transform:uppercase}
 
@@ -274,10 +276,17 @@ function teamRow(key,label){ const v=(VALUES[key]||{}).team_id;
 function textRow(key,label,ph){ const v=(VALUES[key]||{}).player_text||"";
   return row(key,label,`<input data-key="${key}" data-role="text" placeholder="${ph}" value="${v.replace(/"/g,'&quot;')}">`); }
 function hasFootballers(){ return !!(DATA && DATA.footballers && DATA.footballers.length); }
-function playerOptions(sel, filter){
+function playerOptions(sel, filter, q){
   let list = DATA.footballers;
   if(filter==="gk") list = list.filter(p=>p.position==="G");
   else if(filter && filter.length===1) list = list.filter(p=>p.group===filter);  // group letter
+  if(q){
+    const norm=s=>(s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");
+    const nq=norm(q);
+    const cur=list.find(p=>String(p.player_id)===String(sel));
+    list=list.filter(p=>norm(p.name).includes(nq)||norm(p.team_code).includes(nq));
+    if(cur && !list.includes(cur)) list=[cur].concat(list);  // current pick always stays selectable
+  }
   let h='<option value="">— select player —</option>', grp=null;
   list.forEach(p=>{
     const label = p.team_code || (p.group?('Group '+p.group):'?');
@@ -289,7 +298,9 @@ function playerOptions(sel, filter){
 }
 function playerRow(key,label,filter,ph){
   if(hasFootballers()){ const v=(VALUES[key]||{}).player_id;
-    return row(key,label,`<select data-key="${key}" data-role="player">${playerOptions(v,filter)}</select>`); }
+    return row(key,label,`<div class="pwrap">`+
+      `<input class="pfind" data-pkey="${key}" data-pfilter="${filter||''}" placeholder="Type to search players…" autocomplete="off">`+
+      `<select data-key="${key}" data-role="player">${playerOptions(v,filter)}</select></div>`); }
   return textRow(key,label,ph);   // graceful fallback before the squad import runs
 }
 function matchRow(m){
@@ -758,7 +769,15 @@ async function loadPlayer(player){
 }
 
 $("#app").addEventListener("change", onChange);
-$("#app").addEventListener("input", e=>{ if(["text","note","scalar","score_home","score_away"].includes(e.target.dataset.role)) onChange(e); });
+$("#app").addEventListener("input", e=>{
+  if(e.target.classList.contains("pfind")){
+    const key=e.target.dataset.pkey;
+    const sel=document.querySelector(`select[data-role="player"][data-key="${CSS.escape(key)}"]`);
+    if(sel) sel.innerHTML=playerOptions((VALUES[key]||{}).player_id, e.target.dataset.pfilter||undefined, e.target.value.trim());
+    return;
+  }
+  if(["text","note","scalar","score_home","score_away"].includes(e.target.dataset.role)) onChange(e);
+});
 function onBracketAct(b){
   const act=b.dataset.act;
   if(act==="rank"){

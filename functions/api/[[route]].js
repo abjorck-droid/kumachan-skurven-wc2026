@@ -476,7 +476,7 @@ async function publicView(env) {
   const [playerRecs, teamRecs, matchRecs, sideRecs] = await Promise.all([
     atList(env, "PoolPlayers", ["name", "display_color", "total_score",
       "tokens_remaining_double", "tokens_remaining_triple", "tokens_remaining_allin", "mulligans_remaining"]),
-    atList(env, "Teams", ["team_id", "code", "name", "group", "fifa_ranking", "kit_color_primary"]),
+    atList(env, "Teams", ["team_id", "code", "name", "group", "fifa_ranking", "kit_color_primary", "flag_emoji"]),
     listPublicMatches(env),
     atList(env, "SideGames", ["name", "base_points", "resolution_type", "resolved_value", "dark_horse_ladder"]),
   ]);
@@ -495,7 +495,7 @@ async function publicView(env) {
     if (f.team_id == null) continue;
     teamByRec[r.id] = { team_id: f.team_id, code: f.code, name: f.name, group: f.group };
     teams.push({ id: f.team_id, code: f.code, name: f.name, group: f.group,
-      fifa_ranking: f.fifa_ranking, kit: f.kit_color_primary });
+      fifa_ranking: f.fifa_ranking, kit: f.kit_color_primary, flag: f.flag_emoji });
   }
   teams.sort((a, b) => (a.group || "Z").localeCompare(b.group || "Z") || (a.name || "").localeCompare(b.name || ""));
 

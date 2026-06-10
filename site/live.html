@@ -618,11 +618,11 @@ function matchCard(m){
       '<span class="stage">'+esc(stage)+'</span></div>'+
     '<div class="matchup">'+
       '<div class="team home"><div class="kitbar" style="background:'+(t1.kit||"#444")+'"></div>'+
-        '<div class="tcode">'+esc(m.home_code||"?")+'</div><div class="tname">'+esc(m.home_name||"")+'</div></div>'+
+        '<div class="tcode">'+(t1.flag?esc(t1.flag)+" ":"")+esc(m.home_code||"?")+'</div><div class="tname">'+esc(m.home_name||"")+'</div></div>'+
       '<div class="score-block"><div class="bigsc'+((fin||live)?"":" pending")+'">'+sc+'</div>'+
         '<div class="under'+(live?" livemin":"")+'">'+esc(under)+'</div></div>'+
       '<div class="team away"><div class="kitbar" style="background:'+(t2.kit||"#444")+'"></div>'+
-        '<div class="tcode">'+esc(m.away_code||"?")+'</div><div class="tname">'+esc(m.away_name||"")+'</div></div>'+
+        '<div class="tcode">'+(t2.flag?esc(t2.flag)+" ":"")+esc(m.away_code||"?")+'</div><div class="tname">'+esc(m.away_name||"")+'</div></div>'+
     '</div>'+
     '<div class="predictions">'+pickCell(P1(),m,1)+pickCell(P2(),m,2)+'</div>'+
     bonusStrip(m)+'</div>';
@@ -962,7 +962,7 @@ function standingsTab(){
        '<tr><th class="tm">Team</th><th>P</th><th>W</th><th>D</th><th>L</th><th>GD</th><th>Pts</th></tr>';
     byGroup[g].sort(function(a,b){return (a.rank||99)-(b.rank||99);}).forEach(function(s){
       var t=IDX.teamById[s.team_id]||{};
-      h+='<tr><td class="tm">'+esc(t.code||t.name||"?")+'</td><td>'+(s.played!=null?s.played:0)+'</td>'+
+      h+='<tr><td class="tm">'+(t.flag?esc(t.flag)+" ":"")+esc(t.code||t.name||"?")+'</td><td>'+(s.played!=null?s.played:0)+'</td>'+
          '<td>'+(s.win!=null?s.win:0)+'</td><td>'+(s.draw!=null?s.draw:0)+'</td><td>'+(s.loss!=null?s.loss:0)+'</td>'+
          '<td>'+(s.gd!=null?s.gd:0)+'</td><td class="ptscol">'+(s.points!=null?s.points:0)+'</td></tr>';
     });
@@ -1038,10 +1038,10 @@ document.addEventListener("visibilitychange",function(){
 /* ---- offline demo payload (?demo=1) — lets the page be eyeballed with no API ---- */
 function demoData(){
   var teams=[
-    {id:1,code:"MEX",name:"Mexico",group:"A",kit:"#0a7d3c"},{id:2,code:"CRO",name:"Croatia",group:"A",kit:"#d52b1e"},
-    {id:3,code:"KOR",name:"South Korea",group:"A",kit:"#0b1f5e"},{id:4,code:"RSA",name:"South Africa",group:"A",kit:"#007a4d"},
-    {id:5,code:"ESP",name:"Spain",group:"B",kit:"#c60b1e"},{id:6,code:"NED",name:"Netherlands",group:"B",kit:"#ff6a00"},
-    {id:7,code:"JPN",name:"Japan",group:"B",kit:"#1c2b6b"},{id:8,code:"USA",name:"USA",group:"B",kit:"#3b5bbf"},
+    {id:1,code:"MEX",name:"Mexico",group:"A",kit:"#0a7d3c",flag:"🇲🇽"},{id:2,code:"CRO",name:"Croatia",group:"A",kit:"#d52b1e",flag:"🇭🇷"},
+    {id:3,code:"KOR",name:"South Korea",group:"A",kit:"#0b1f5e",flag:"🇰🇷"},{id:4,code:"RSA",name:"South Africa",group:"A",kit:"#007a4d",flag:"🇿🇦"},
+    {id:5,code:"ESP",name:"Spain",group:"B",kit:"#c60b1e",flag:"🇪🇸"},{id:6,code:"NED",name:"Netherlands",group:"B",kit:"#ff6a00",flag:"🇳🇱"},
+    {id:7,code:"JPN",name:"Japan",group:"B",kit:"#1c2b6b",flag:"🇯🇵"},{id:8,code:"USA",name:"USA",group:"B",kit:"#3b5bbf",flag:"🇺🇸"},
   ];
   var matches=[
     {fixture_id:100,round:"Group Stage - 1",group:"A",kickoff:"2026-06-11T20:00:00Z",status:"Finished",home_id:1,home_code:"MEX",home_name:"Mexico",away_id:2,away_code:"CRO",away_name:"Croatia",home_score:2,away_score:1,winner_id:1,winner_method:"Regulation",venue:"Estadio Azteca, Mexico City"},
