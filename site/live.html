@@ -891,7 +891,7 @@ function bkMount(){
 function bracketTab(){
   var hasKO=(D.matches||[]).some(function(m){return koRound(m.round);});
   var view=BRK_VIEW||(hasKO?"tree":"ladder");
-  var h='<h2>Brackets</h2>';
+  var h='<h2>Brackets</h2>'+darkHorseHTML();
   var legend = BRK_MODE==="H"
     ? '<span><span class="sw a"></span>'+esc(P1().name)+'</span><span><span class="sw c"></span>'+esc(P2().name)+'</span>'+
       '<span><span class="sw both"></span>Both agree</span><span><span class="sw tok"></span>Token</span>'
@@ -920,7 +920,7 @@ function bracketTab(){
   } else {
     h+=ladderHTML();
   }
-  return h+darkHorseHTML();
+  return h;
 }
 
 function sideTab(){
