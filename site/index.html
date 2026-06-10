@@ -74,6 +74,7 @@
   .warnbox b{font-family:'Antonio',sans-serif;font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--gold)}
   .warnbox ul{margin:8px 0 0 18px;font-size:13px;color:var(--text-dim);line-height:1.6}
   .okline{margin:20px 0 0;font-family:'Antonio',sans-serif;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--good)}
+  .conswarn{display:none;margin:6px 0 10px;padding:7px 10px;border:1px solid rgba(232,185,72,.4);border-radius:6px;background:var(--gold-soft);color:var(--text-dim);font-size:12.5px;line-height:1.5}
   .lockbar{margin:36px 0 10px;padding:18px;border:1px solid var(--border-strong);border-radius:8px;background:var(--card)}
   .lockbar .summary{display:flex;gap:22px;flex-wrap:wrap;font-family:'Antonio',sans-serif;font-size:13px;letter-spacing:.06em;color:var(--text-dim);text-transform:uppercase;margin-bottom:14px}
   .lockbar .summary b{color:var(--text);font-size:18px;font-family:'Cormorant Garamond',serif}
@@ -443,7 +444,7 @@ function renderKOContent(){
         const ri=order.indexOf(String(t.id));
         return `<button class="goteam${ri>=0?' ranked r'+(ri+1):''}" data-act="rank" data-group="${g}" data-team="${t.id}"${dis}>`+
           `<span class="gobadge">${ri>=0?(ri+1):''}</span>${t.code||"?"} <span class="goname">${t.name||""}</span></button>`;
-      }).join("")+`</div>`;
+      }).join("")+`<div class="conswarn" id="gowarn-${g}"></div></div>`;
   }).join("")+`</div>`;
 
   const thirdTeams=GROUPS.map(g=>(BR.go[g]||[])[2]?{g, team:teamById(BR.go[g][2])||{}}:null);
@@ -507,7 +508,8 @@ function render(){
   if(groupMatches.length){
     mk += `<h2>Group matches <span class="pts">· 5 pts outcome · +10 exact</span></h2><div class="sub">Call every group match. The scoreline is optional — add it only where you want the +10 exact-score bonus.</div>`;
     let g=null;
-    groupMatches.forEach(m=>{ if(m.group!==g){ g=m.group; mk+=`<div class="grp-label">Group ${g||'?'}</div>`; } mk+=matchRow(m); });
+    groupMatches.forEach(m=>{ if(m.group!==g){ if(g) mk+=`<div class="conswarn" id="mwarn-${g}"></div>`; g=m.group; mk+=`<div class="grp-label">Group ${g||'?'}</div>`; } mk+=matchRow(m); });
+    if(g) mk+=`<div class="conswarn" id="mwarn-${g}"></div>`;
   } else {
     mk += `<h2>Group matches</h2><div class="sub">No fixtures loaded yet — run <code>load_fixtures.py</code>.</div>`;
   }
@@ -611,8 +613,58 @@ function updateReserves(){
     return `<span class="chip ${left===0?'empty':''}">${lab} ${left}/${tot}</span>`;
   }).join('');
 }
+// --- group-pick consistency (advisory only — never blocks save or lock) -----
+// From the match-outcome picks, each team's group points are exact where all its
+// matches are called, and a [min,max] range where some are blank (a blank match
+// can contribute 0 or 3). Warn ONLY when the called finishing order is
+// mathematically impossible: a lower-placed team is guaranteed more points than
+// a higher-placed one can possibly reach. Teams level on points stay silent —
+// that's tiebreaker (GD/goals) territory we can't see from outcome picks.
+function groupPointsRange(g){
+  const pts={};
+  (DATA.teams||[]).filter(t=>t.group===g).forEach(t=>{ pts[String(t.id)]={min:0,max:0,name:t.code||t.name||"?"}; });
+  (DATA.matches||[]).filter(m=>m.group===g && String(m.round||"").toLowerCase().startsWith("group")).forEach(m=>{
+    const h=String(m.home_id||""), a=String(m.away_id||"");
+    if(!pts[h]||!pts[a]) return;
+    const oc=(VALUES["match|"+m.fixture_id]||{}).outcome;
+    if(oc==="Home"){ pts[h].min+=3; pts[h].max+=3; }
+    else if(oc==="Away"){ pts[a].min+=3; pts[a].max+=3; }
+    else if(oc==="Draw"){ pts[h].min+=1; pts[h].max+=1; pts[a].min+=1; pts[a].max+=1; }
+    else { pts[h].max+=3; pts[a].max+=3; }                 // unpicked — anything can happen
+  });
+  return pts;
+}
+function groupConsistencyWarning(g){
+  const order=BR.go[g]||[];
+  if(order.length<3) return null;                          // standings not fully called
+  const pts=groupPointsRange(g);
+  const ids=Object.keys(pts);
+  if(ids.length!==4) return null;                          // teams not loaded / pre-draw
+  const ranked=[...order, ids.find(id=>!order.includes(id))].filter(Boolean);
+  const ord=["1st","2nd","3rd","4th"];
+  for(let lo=ranked.length-1;lo>0;lo--) for(let hi=0;hi<lo;hi++){
+    const A=pts[ranked[hi]], B=pts[ranked[lo]];
+    if(B && A && B.min>A.max){
+      const bp=B.min===B.max?`${B.min} pts`:`at least ${B.min} pts`;
+      return `Hey buddy, you sure? Your match picks give ${B.name} ${bp}, but you placed them ${ord[lo]} — behind ${A.name}, who can reach at most ${A.max}. One of the two needs to change.`;
+    }
+  }
+  return null;
+}
+function updateGroupWarnings(){
+  GROUPS.forEach(g=>{
+    const msg=groupConsistencyWarning(g);
+    ["gowarn-","mwarn-"].forEach(p=>{
+      const el=document.getElementById(p+g); if(!el) return;
+      el.textContent=msg?("⚠ "+msg):"";
+      el.style.display=msg?"block":"none";
+    });
+  });
+}
+
 function updateSummary(){
   updateTabCounts();
+  updateGroupWarnings();
   const total=Object.values(VALUES).filter(v=>v.team_id||v.player_id||v.player_text||v.outcome||v.bet_type||v.scalar!==undefined&&v.scalar!==""||v.token).length;
   const used=countTokens();
   const el=$("#summary"); if(!el) return;
@@ -825,6 +877,7 @@ document.addEventListener("click", e=>{
 window.__T = { ROUNDS, ALL_SLOT_KEYS, GROUPS, slotKeyOf, buildR32, chainIdx, pruneAssign,
   structureComplete, syncStructValues, propagateBR, loadStructFromValues, bracketProgress,
   renderKOContent, collectPicks, onBracketAct, countTokens,
+  groupPointsRange, groupConsistencyWarning,
   set(o){ if(o.DATA!==undefined)DATA=o.DATA; if(o.VALUES!==undefined)VALUES=o.VALUES;
           if(o.BR!==undefined)BR=o.BR; if(o.META!==undefined)META=o.META; if(o.LOCKED!==undefined)LOCKED=o.LOCKED; },
   get(){ return {DATA,VALUES,BR,META,LOCKED}; } };
