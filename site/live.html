@@ -729,7 +729,7 @@ function darkHorseHTML(){
     var p=pl.locked?(IDX.picksBy[pl.name]||{})["darkhorse"]:null;
     var t=p?(IDX.teamById[p.team_id]||{}):{};
     h+='<div class="dhcard '+pair[1]+'"><div class="who">'+esc(pl.name)+'</div>'+
-       '<div class="tm">'+(pl.locked?esc(t.code||"—"):"hidden")+'</div>'+
+       '<div class="tm">'+(pl.locked?(t.flag?esc(t.flag)+" ":"")+esc(t.code||"—"):"hidden")+'</div>'+
        (t.name?'<div class="lad">'+esc(t.name)+(p&&p.token?" · "+p.token:"")+(p&&p.points!=null?' · +'+p.points+' so far':'')+'</div>':"")+
        '</div>';
   });
@@ -783,7 +783,7 @@ function bkChip(no, opts){
     }
     var won=(m&&m.status==="Finished"&&m.winner_id!=null&&tid===m.winner_id)?'<span class="won">✓</span>':"";
     rows+='<div class="bk-slot '+pcls+'"><span class="kit" style="background:'+kit+'"></span>'+
-      '<span class="code">'+esc(code)+won+'</span><span class="src">'+esc(src)+'</span></div>';
+      '<span class="code">'+(t&&t.flag?esc(t.flag)+" ":"")+esc(code)+won+'</span><span class="src">'+esc(src)+'</span></div>';
   }
   var tok=tokTags.length?'<span class="bk-tok">'+tokTags.map(function(t){
     return '<i class="ow '+t.by+'"></i>'+esc(t.label);}).join(" ")+'</span>':"";
@@ -791,8 +791,9 @@ function bkChip(no, opts){
 }
 function bkChampion(){
   var pA=(IDX.picksBy[P1().name]||{})["Champion"], pC=(IDX.picksBy[P2().name]||{})["Champion"];
-  var ca=pA?((IDX.teamById[pA.team_id]||{}).code||"—"):"—";
-  var cc=pC?((IDX.teamById[pC.team_id]||{}).code||"—"):"—";
+  var tA=pA?(IDX.teamById[pA.team_id]||{}):{}, tC=pC?(IDX.teamById[pC.team_id]||{}):{};
+  var ca=pA?((tA.flag?tA.flag+" ":"")+(tA.code||"—")):"—";
+  var cc=pC?((tC.flag?tC.flag+" ":"")+(tC.code||"—")):"—";
   if(BRK_MODE==="H"){
     return '<div class="bk-champ"><div class="trophy">♛</div><div class="lab">Predicted Champion</div>'+
       '<div class="cmp"><div class="rw a"><span class="who">'+esc(P1().name)+'</span><span class="tm">'+esc(ca)+'</span></div>'+
