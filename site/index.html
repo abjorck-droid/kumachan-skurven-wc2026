@@ -181,23 +181,90 @@ const ROUNDS = [
 function slotKeyOf(ri,idx){ const r=ROUNDS[ri]; return r.prefix==="Champion"?"Champion":r.prefix+idx; }
 const ALL_SLOT_KEYS = ROUNDS.flatMap((r,ri)=>Array.from({length:r.n},(_,i)=>slotKeyOf(ri,i+1)));
 
-// House template for the pre-draw Round of 32 (cosmetic — sets are what score):
-// winners A–H face the eight advancing thirds in group-letter order; winners I–L
-// face runners-up A–D; runners-up E..L pair off E-F, G-H, I-J, K-L.
+// Official FIFA 2026 bracket (matches 73–104; same structure as live.html BR_SRC).
+// R32 index i (1–16) = FIFA match 72+i. Eight group winners (E,I,A,L,D,G,B,K)
+// face the advancing thirds; WHICH third goes where comes from Annex C of the
+// regulations — canonical copy in data/thirds_alloc_2026.json, embedded below.
+// Annex C of the FIFA 2026 regulations: third-place allocation, one row per combination of 8 advancing third-place groups (495 rows). Value = the third assigned to the winners of groups A,B,D,E,G,I,K,L in that column order. Row order: lexicographic by the EXCLUDED four groups (row 1 = thirds EFGHIJKL ... row 495 = ABCDEFGH).
+const THIRDS_BLOB =
+  "EJIFHGLKHGIDJFLKEJIDHGLKEJIDHFLKEGIDJFLKEGJDHFLKEGIDHFLKEGJDHFLIEGJDHFIKHGICJFLKEJICHGLK"+
+  "EJICHFLKEGICJFLKEGJCHFLKEGICHFLKEGJCHFLIEGJCHFIKHGICJDLKCJIDHFLKCGIDJFLKCGJDHFLKCGIDHFLK"+
+  "CGJDHFLICGJDHFIKEJICHDLKEGICJDLKEGJCHDLKEGICHDLKEGJCHDLIEGJCHDIKCJEDIFLKCJEDHFLKCEIDHFLK"+
+  "CJEDHFLICJEDHFIKCGEDJFLKCGEDIFLKCGEDJFLICGEDJFIKCGEDHFLKCGJDHFLECGJDHFEKCGEDHFLICGEDHFIK"+
+  "CGJDHFEIHJBFIGLKEJIBHGLKEJBFIHLKEJBFIGLKEJBFHGLKEGBFIHLKEJBFHGLIEJBFHGIKHJBDIGLKHJBDIFLK"+
+  "IGBDJFLKHGBDJFLKHGBDIFLKHGBDJFLIHGBDJFIKEJBDIHLKEJBDIGLKEJBDHGLKEGBDIHLKEJBDHGLIEJBDHGIK"+
+  "EJBDIFLKEJBDHFLKEIBDHFLKEJBDHFLIEJBDHFIKEGBDJFLKEGBDIFLKEGBDJFLIEGBDJFIKEGBDHFLKHGBDJFLE"+
+  "HGBDJFEKEGBDHFLIEGBDHFIKHGBDJFEIHJBCIGLKHJBCIFLKIGBCJFLKHGBCJFLKHGBCIFLKHGBCJFLIHGBCJFIK"+
+  "EJBCIHLKEJBCIGLKEJBCHGLKEGBCIHLKEJBCHGLIEJBCHGIKEJBCIFLKEJBCHFLKEIBCHFLKEJBCHFLIEJBCHFIK"+
+  "EGBCJFLKEGBCIFLKEGBCJFLIEGBCJFIKEGBCHFLKHGBCJFLEHGBCJFEKEGBCHFLIEGBCHFIKHGBCJFEIHJBCIDLK"+
+  "IGBCJDLKHGBCJDLKHGBCIDLKHGBCJDLIHGBCJDIKCJBDIFLKCJBDHFLKCIBDHFLKCJBDHFLICJBDHFIKCGBDJFLK"+
+  "CGBDIFLKCGBDJFLICGBDJFIKCGBDHFLKCGBDHFLJHGBCJFDKCGBDHFLICGBDHFIKHGBCJFDIEJBCIDLKEJBCHDLK"+
+  "EIBCHDLKEJBCHDLIEJBCHDIKEGBCJDLKEGBCIDLKEGBCJDLIEGBCJDIKEGBCHDLKHGBCJDLEHGBCJDEKEGBCHDLI"+
+  "EGBCHDIKHGBCJDEICJBDEFLKCEBDIFLKCJBDEFLICJBDEFIKCEBDHFLKCJBDHFLECJBDHFEKCEBDHFLICEBDHFIK"+
+  "CJBDHFEICGBDEFLKCGBDJFLECGBDJFEKCGBDEFLICGBDEFIKCGBDJFEICGBDHFLECGBDHFEKHGBCJFDECGBDHFEI"+
+  "HJIFAGLKEJIAHGLKEJIFAHLKEJIFAGLKEGJFAHLKEGIFAHLKEGJFAHLIEGJFAHIKHJIDAGLKHJIDAFLKIGJDAFLK"+
+  "HGJDAFLKHGIDAFLKHGJDAFLIHGJDAFIKEJIDAHLKEJIDAGLKEGJDAHLKEGIDAHLKEGJDAHLIEGJDAHIKEJIDAFLK"+
+  "HJEDAFLKHEIDAFLKHJEDAFLIHJEDAFIKEGJDAFLKEGIDAFLKEGJDAFLIEGJDAFIKHGEDAFLKHGJDAFLEHGJDAFEK"+
+  "HGEDAFLIHGEDAFIKHGJDAFEIHJICAGLKHJICAFLKIGJCAFLKHGJCAFLKHGICAFLKHGJCAFLIHGJCAFIKEJICAHLK"+
+  "EJICAGLKEGJCAHLKEGICAHLKEGJCAHLIEGJCAHIKEJICAFLKHJECAFLKHEICAFLKHJECAFLIHJECAFIKEGJCAFLK"+
+  "EGICAFLKEGJCAFLIEGJCAFIKHGECAFLKHGJCAFLEHGJCAFEKHGECAFLIHGECAFIKHGJCAFEIHJICADLKIGJCADLK"+
+  "HGJCADLKHGICADLKHGJCADLIHGJCADIKCJIDAFLKHJFCADLKHFICADLKHJFCADLIHJFCADIKCGJDAFLKCGIDAFLK"+
+  "CGJDAFLICGJDAFIKHGFCADLKCGJDAFLHHGJCAFDKHGFCADLIHGFCADIKHGJCAFDIEJICADLKHJECADLKHEICADLK"+
+  "HJECADLIHJECADIKEGJCADLKEGICADLKEGJCADLIEGJCADIKHGECADLKHGJCADLEHGJCADEKHGECADLIHGECADIK"+
+  "HGJCADEICJEDAFLKCEIDAFLKCJEDAFLICJEDAFIKHEFCADLKHJFCADLEHJECAFDKHEFCADLIHEFCADIKHJECAFDI"+
+  "CGEDAFLKCGJDAFLECGJDAFEKCGEDAFLICGEDAFIKCGJDAFEIHGFCADLEHGECAFDKHGJCAFDEHGECAFDIHJBAIGLK"+
+  "HJBAIFLKIJBFAGLKHJBFAGLKHGBAIFLKHJBFAGLIHJBFAGIKEJBAIHLKEJBAIGLKEJBAHGLKEGBAIHLKEJBAHGLI"+
+  "EJBAHGIKEJBAIFLKEJBFAHLKEIBFAHLKEJBFAHLIEJBFAHIKEJBFAGLKEGBAIFLKEJBFAGLIEJBFAGIKEGBFAHLK"+
+  "HJBFAGLEHJBFAGEKEGBFAHLIEGBFAHIKHJBFAGEIIJBDAHLKIJBDAGLKHJBDAGLKIGBDAHLKHJBDAGLIHJBDAGIK"+
+  "IJBDAFLKHJBDAFLKHIBDAFLKHJBDAFLIHJBDAFIKFJBDAGLKIGBDAFLKFJBDAGLIFJBDAGIKHGBDAFLKHGBDAFLJ"+
+  "HGBDAFJKHGBDAFLIHGBDAFIKHGBDAFIJEJBAIDLKEJBDAHLKEIBDAHLKEJBDAHLIEJBDAHIKEJBDAGLKEGBAIDLK"+
+  "EJBDAGLIEJBDAGIKEGBDAHLKHJBDAGLEHJBDAGEKEGBDAHLIEGBDAHIKHJBDAGEIEJBDAFLKEIBDAFLKEJBDAFLI"+
+  "EJBDAFIKHEBDAFLKHJBDAFLEHJBDAFEKHEBDAFLIHEBDAFIKHJBDAFEIEGBDAFLKEGBDAFLJEGBDAFJKEGBDAFLI"+
+  "EGBDAFIKEGBDAFIJHGBDAFLEHGBDAFEKHGBDAFEJHGBDAFEIIJBCAHLKIJBCAGLKHJBCAGLKIGBCAHLKHJBCAGLI"+
+  "HJBCAGIKIJBCAFLKHJBCAFLKHIBCAFLKHJBCAFLIHJBCAFIKCJBFAGLKIGBCAFLKCJBFAGLICJBFAGIKHGBCAFLK"+
+  "HGBCAFLJHGBCAFJKHGBCAFLIHGBCAFIKHGBCAFIJEJBAICLKEJBCAHLKEIBCAHLKEJBCAHLIEJBCAHIKEJBCAGLK"+
+  "EGBAICLKEJBCAGLIEJBCAGIKEGBCAHLKHJBCAGLEHJBCAGEKEGBCAHLIEGBCAHIKHJBCAGEIEJBCAFLKEIBCAFLK"+
+  "EJBCAFLIEJBCAFIKHEBCAFLKHJBCAFLEHJBCAFEKHEBCAFLIHEBCAFIKHJBCAFEIEGBCAFLKEGBCAFLJEGBCAFJK"+
+  "EGBCAFLIEGBCAFIKEGBCAFIJHGBCAFLEHGBCAFEKHGBCAFEJHGBCAFEIIJBCADLKHJBCADLKHIBCADLKHJBCADLI"+
+  "HJBCADIKCJBDAGLKIGBCADLKCJBDAGLICJBDAGIKHGBCADLKHGBCADLJHGBCADJKHGBCADLIHGBCADIKHGBCADIJ"+
+  "CJBDAFLKCIBDAFLKCJBDAFLICJBDAFIKHFBCADLKCJBDAFLHHJBCAFDKHFBCADLIHFBCADIKHJBCAFDICGBDAFLK"+
+  "CGBDAFLJCGBDAFJKCGBDAFLICGBDAFIKCGBDAFIJCGBDAFLHHGBCAFDKHGBCAFDJHGBCAFDIEJBCADLKEIBCADLK"+
+  "EJBCADLIEJBCADIKHEBCADLKHJBCADLEHJBCADEKHEBCADLIHEBCADIKHJBCADEIEGBCADLKEGBCADLJEGBCADJK"+
+  "EGBCADLIEGBCADIKEGBCADIJHGBCADLEHGBCADEKHGBCADEJHGBCADEICEBDAFLKCJBDAFLECJBDAFEKCEBDAFLI"+
+  "CEBDAFIKCJBDAFEIHFBCADLEHEBCAFDKHJBCAFDEHEBCAFDICGBDAFLECGBDAFEKCGBDAFEJCGBDAFEIHGBCAFDE";
+const THIRDS_ALLOC = (()=>{ const out={}, L="ABCDEFGHIJKL"; let r=0;
+  for(let a=0;a<9;a++)for(let b=a+1;b<10;b++)for(let c=b+1;c<11;c++)for(let d=c+1;d<12;d++){
+    const ex=L[a]+L[b]+L[c]+L[d];
+    out[L.split("").filter(x=>!ex.includes(x)).join("")]=THIRDS_BLOB.slice(r*8,r*8+8); r++; }
+  return out; })();
+// Which previous-round matches feed each match (1-based per round):
+// R16 = FIFA 89–96, QF = 97–100, SF = 101–102, Final = 104.
+const FEEDS=[null,
+  [[2,5],[1,3],[4,6],[7,8],[11,12],[9,10],[14,16],[13,15]],
+  [[1,2],[5,6],[3,4],[7,8]],
+  [[1,2],[3,4]],
+  [[1,2]]];
+const PARENT=FEEDS.map(f=>{ if(!f) return null;
+  const p=[0]; f.forEach((pair,i)=>pair.forEach(j=>{p[j]=i+1;})); return p; });
+const FIFA_BASE=[72,88,96,100,103];
+function fifaNo(ri,k){ return FIFA_BASE[ri]+k; }
 function buildR32(go, thirds){
   const ok = GROUPS.every(g=>(go[g]||[]).length===3) && (thirds||[]).length===8;
   if(!ok) return null;
-  const t=thirds.slice().sort();
+  const al=THIRDS_ALLOC[thirds.slice().sort().join("")];
+  if(!al) return null;
+  const tof={A:al[0],B:al[1],D:al[2],E:al[3],G:al[4],I:al[5],K:al[6],L:al[7]};
   const W=l=>({id:String(go[l][0]), src:l+"1"});
   const RU=l=>({id:String(go[l][1]), src:l+"2"});
-  const TH=l=>({id:String(go[l][2]), src:l+"3"});
-  const ms=[];
-  "ABCDEFGH".split("").forEach((l,i)=>ms.push([W(l),TH(t[i])]));
-  "IJKL".split("").forEach((l,i)=>ms.push([W(l),RU("ABCD"[i])]));
-  [["E","F"],["G","H"],["I","J"],["K","L"]].forEach(p=>ms.push([RU(p[0]),RU(p[1])]));
-  return ms;   // 16 matches; index i = match i+1
+  const TH=l=>({id:String(go[tof[l]][2]), src:tof[l]+"3"});
+  return [
+    [RU("A"),RU("B")],[W("E"),TH("E")],[W("F"),RU("C")],[W("C"),RU("F")],
+    [W("I"),TH("I")],[RU("E"),RU("I")],[W("A"),TH("A")],[W("L"),TH("L")],
+    [W("D"),TH("D")],[W("G"),TH("G")],[RU("K"),RU("L")],[W("H"),RU("J")],
+    [W("B"),TH("B")],[W("J"),RU("H")],[W("K"),TH("K")],[RU("D"),RU("G")],
+  ];   // 16 matches; index i = FIFA match 73+i
 }
-function chainIdx(m32, ri){ let m=m32; for(let i=0;i<ri;i++) m=Math.ceil(m/2); return m; }
+function chainIdx(m32, ri){ let m=m32; for(let i=1;i<=ri;i++) m=PARENT[i][m]; return m; }
 
 // Surgical cascade: re-derive every slot from the team identities currently picked.
 // A team that merely changes position keeps its pick (and token/note); a team that
@@ -468,8 +535,9 @@ function renderKOContent(){
     h += `<div class="bgate">The bracket builds itself once the group stage is called — <b>${p.groups}/12 groups ordered, ${p.thirds}/8 thirds chosen</b>.
       Then you advance teams round by round to a champion.</div>`;
   } else {
-    h += `<div class="sub">Tap the team that wins each tie. Pairings use a fixed house template until the real draw exists —
-      scoring only counts <b>which teams reach each round</b>, so the matchups are scaffolding, not picks.
+    h += `<div class="sub">Tap the team that wins each tie. Pairings follow the <b>official FIFA bracket</b> (matches 73–104):
+      fixed slots for group winners and runners-up, plus FIFA\u2019s Annex C table placing the eight advancing thirds.
+      Scoring still counts <b>which teams reach each round</b>.
       Changing a group finish keeps every surviving pick (tokens ride along); only teams that drop out are cleared.</div>`;
     ROUNDS.forEach((r,ri)=>{
       h += `<div class="grp-label">${r.label} <span style="color:var(--text-mute)">· winner takes ${r.prefix==="Champion"?"the crown":"a "+r.slotName} · ${r.pts} pts</span></div>`;
@@ -477,12 +545,12 @@ function renderKOContent(){
         const target=slotKeyOf(ri,k);
         const feeders = ri===0
           ? ms[k-1].map(s=>({id:s.id, src:s.src}))
-          : [2*k-1,2*k].map(j=>{
+          : FEEDS[ri][k-1].map(j=>{
               const pv=VALUES[slotKeyOf(ri-1,j)];
               return (pv&&pv.team_id) ? {id:String(pv.team_id), src:null}
-                                      : {id:null, src:ROUNDS[ri-1].key+" M"+j+" winner"};
+                                      : {id:null, src:"M"+fifaNo(ri-1,j)+" winner"};
             });
-        h += bracketMatchRow(target, feeders, r, r.n===1?"Final":r.key+" M"+k);
+        h += bracketMatchRow(target, feeders, r, r.n===1?"Final · M104":"M"+fifaNo(ri,k));
       }
     });
   }

@@ -71,26 +71,33 @@ function structPicks(overrides = {}) {
     player_text: overrides.thirds_advance ?? "A,B,C,D,E,F,G,H" });
   return ps;
 }
-// winner of R32 match k under the house template (mirrors buildR32, home side = group winner / first RU)
+// R32 match k under the official template (mirrors buildR32; fixture thirds = A\u2013H
+// \u2192 Annex C row 495 "HGBCAFDE": 1A v 3H, 1B v 3G, 1D v 3B, 1E v 3C, 1G v 3A, 1I v 3F, 1K v 3D, 1L v 3E).
+const TOF = { A: "H", B: "G", D: "B", E: "C", G: "A", I: "F", K: "D", L: "E" };
 function entrantsOf(k) {
-  const T = thirds.slice().sort();
-  if (k <= 8) return [go["ABCDEFGH"[k - 1]][0], go[T[k - 1]][2]];
-  if (k <= 12) return [go["IJKL"[k - 9]][0], go["ABCD"[k - 9]][1]];
-  const pairs = [["E", "F"], ["G", "H"], ["I", "J"], ["K", "L"]];
-  const [a, b] = pairs[k - 13];
-  return [go[a][1], go[b][1]];
+  const W = (l) => go[l][0], RU = (l) => go[l][1], TH = (l) => go[TOF[l]][2];
+  return [
+    [RU("A"), RU("B")], [W("E"), TH("E")], [W("F"), RU("C")], [W("C"), RU("F")],
+    [W("I"), TH("I")], [RU("E"), RU("I")], [W("A"), TH("A")], [W("L"), TH("L")],
+    [W("D"), TH("D")], [W("G"), TH("G")], [RU("K"), RU("L")], [W("H"), RU("J")],
+    [W("B"), TH("B")], [W("J"), RU("H")], [W("K"), TH("K")], [RU("D"), RU("G")],
+  ][k - 1];
 }
+// official feeds: R16 89\u201396 take winners of these R32 matches, etc.
+const FEEDS1 = [[2, 5], [1, 3], [4, 6], [7, 8], [11, 12], [9, 10], [14, 16], [13, 15]];
+const FEEDS2 = [[1, 2], [5, 6], [3, 4], [7, 8]];
+const FEEDS3 = [[1, 2], [3, 4]];
 function fullBracketPicks() {
   const picks = structPicks();
-  const r16 = []; for (let k = 1; k <= 16; k++) r16.push(entrantsOf(k)[0]);
-  r16.forEach((t, i) => picks.push({ key: "R16-" + (i + 1), type: "bracket_slot", bracket_slot: "R16-" + (i + 1), team_id: t }));
-  const qf = r16.filter((_, i) => i % 2 === 0);
-  qf.forEach((t, i) => picks.push({ key: "QF-" + (i + 1), type: "bracket_slot", bracket_slot: "QF-" + (i + 1), team_id: t }));
-  const sf = qf.filter((_, i) => i % 2 === 0);
-  sf.forEach((t, i) => picks.push({ key: "SF-" + (i + 1), type: "bracket_slot", bracket_slot: "SF-" + (i + 1), team_id: t }));
-  const f = sf.filter((_, i) => i % 2 === 0);
-  f.forEach((t, i) => picks.push({ key: "F-" + (i + 1), type: "bracket_slot", bracket_slot: "F-" + (i + 1), team_id: t, token: i === 0 ? "Double" : undefined }));
-  picks.push({ key: "Champion", type: "bracket_slot", bracket_slot: "Champion", team_id: f[0], token: "AllIn" });
+  const w32 = []; for (let k = 1; k <= 16; k++) w32.push(entrantsOf(k)[0]);
+  w32.forEach((t, i) => picks.push({ key: "R16-" + (i + 1), type: "bracket_slot", bracket_slot: "R16-" + (i + 1), team_id: t }));
+  const w16 = FEEDS1.map((f) => w32[f[0] - 1]);
+  w16.forEach((t, i) => picks.push({ key: "QF-" + (i + 1), type: "bracket_slot", bracket_slot: "QF-" + (i + 1), team_id: t }));
+  const w8 = FEEDS2.map((f) => w16[f[0] - 1]);
+  w8.forEach((t, i) => picks.push({ key: "SF-" + (i + 1), type: "bracket_slot", bracket_slot: "SF-" + (i + 1), team_id: t }));
+  const w4 = FEEDS3.map((f) => w8[f[0] - 1]);
+  w4.forEach((t, i) => picks.push({ key: "F-" + (i + 1), type: "bracket_slot", bracket_slot: "F-" + (i + 1), team_id: t, token: i === 0 ? "Double" : undefined }));
+  picks.push({ key: "Champion", type: "bracket_slot", bracket_slot: "Champion", team_id: w4[0], token: "AllIn" });
   return picks;
 }
 
@@ -134,6 +141,7 @@ function fullBracketPicks() {
 { // nesting violation: champion not among finalists
   const picks = fullBracketPicks();
   picks.find((p) => p.key === "Champion").team_id = picks.find((p) => p.key === "F-2").team_id === idOf("AT0") ? idOf("BT0") : idOf("ET0");
+  // (fixture-dependent: ensured non-final below)
   // ensure champion team is NOT in F set
   const fset = picks.filter((p) => /^F-/.test(p.key)).map((p) => String(p.team_id));
   if (fset.includes(String(picks.find((p) => p.key === "Champion").team_id)))
@@ -143,10 +151,10 @@ function fullBracketPicks() {
 }
 { // same-path hedge: both sides of R32 match 1 in the R16 set
   const picks = fullBracketPicks();
-  const [a, b] = entrantsOf(1);
-  // R16-1 already holds a; repoint R16-2 at b (the other side of match 1)
-  picks.find((p) => p.key === "R16-2").team_id = b;
-  // keep QF coherent (QF-1 holds a which is still in R16)
+  const [a, b] = entrantsOf(16);
+  // R16-16 already holds a (RU D); repoint R16-15 at b (RU G, the other side of M88).
+  // M87/M88 winners feed no QF pick in this fixture, so nesting stays intact.
+  picks.find((p) => p.key === "R16-15").team_id = b;
   const { status, body } = await callSave(makeStore(), picks);
   check("both sides of one tie → 400", status === 400 && /same bracket path/.test(body.error));
 }

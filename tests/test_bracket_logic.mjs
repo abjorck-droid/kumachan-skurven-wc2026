@@ -13,14 +13,31 @@ const ms = T.buildR32(go, thirds);
 check("buildR32 yields 16 matches", ms && ms.length === 16);
 const entrants = ms.flat().map((s) => s.id);
 check("32 unique entrants", new Set(entrants).size === 32);
-check("match 1 is winner A v third A (sorted letters)", ms[0][0].id === id("AT0") && ms[0][1].id === id("AT2"));
-check("match 9 is winner I v runner-up A", ms[8][0].id === id("IT0") && ms[8][1].id === id("AT1"));
-check("match 13 pairs runners-up E and F", ms[12][0].id === id("ET1") && ms[12][1].id === id("FT1"));
-check("source labels carried", ms[0][0].src === "A1" && ms[0][1].src === "A3" && ms[8][1].src === "A2");
+check("M73 is runner-up A v runner-up B", ms[0][0].id === id("AT1") && ms[0][1].id === id("BT1"));
+check("M79 is winner A v third H (Annex C, thirds A\u2013H)", ms[6][0].id === id("AT0") && ms[6][1].id === id("HT2"));
+check("M84 is winner H v runner-up J", ms[11][0].id === id("HT0") && ms[11][1].id === id("JT1"));
+check("M87 is winner K v third D", ms[14][0].id === id("KT0") && ms[14][1].id === id("DT2"));
+check("source labels carried", ms[0][0].src === "A2" && ms[6][1].src === "H3" && ms[11][1].src === "J2");
+{ // full Annex C sweep: all 495 third-combinations build a legal R32
+  let n = 0, ok = true;
+  for (let a = 0; a < 9 && ok; a++) for (let b = a + 1; b < 10 && ok; b++)
+    for (let c = b + 1; c < 11 && ok; c++) for (let d = c + 1; d < 12 && ok; d++) {
+      const ex = [a, b, c, d].map((i) => "ABCDEFGHIJKL"[i]);
+      const th = "ABCDEFGHIJKL".split("").filter((g) => !ex.includes(g));
+      const m = T.buildR32(go, th); n++;
+      if (!m || m.length !== 16) { ok = false; break; }
+      if (!m.every((p) => p[0].src[0] !== p[1].src[0])) { ok = false; break; }  // no same-group rematch
+      if (new Set(m.flat().map((s) => s.id)).size !== 32) { ok = false; break; }
+    }
+  check("Annex C sweep: 495 combos, 32 entrants each, never a same-group tie", ok && n === 495);
+}
 
 // ---- chainIdx ---------------------------------------------------------------
-check("chainIdx identity at R32→R16", T.chainIdx(5, 0) === 5);
-check("chainIdx halves per round", T.chainIdx(5, 1) === 3 && T.chainIdx(16, 4) === 1);
+check("chainIdx identity at R32", T.chainIdx(5, 0) === 5);
+check("chainIdx follows official feeds (M77\u2192M89, M73\u2192M90)", T.chainIdx(5, 1) === 1 && T.chainIdx(1, 1) === 2);
+check("chainIdx QF crossover (M79/M80 side \u2192 QF M99)", T.chainIdx(7, 2) === 3 && T.chainIdx(8, 2) === 3);
+check("1I and 1L sit in opposite halves (meet only in the final)", T.chainIdx(5, 3) !== T.chainIdx(8, 3) && T.chainIdx(5, 4) === T.chainIdx(8, 4));
+check("chainIdx reaches the final from anywhere", T.chainIdx(16, 4) === 1);
 
 // ---- pruneAssign ------------------------------------------------------------
 // helper: winner-of-match-k entrant (home side)
@@ -46,9 +63,9 @@ const W = (k) => ms[k - 1][0].id;
   check("colliding picks both voided", !out["R16-1"] && !out["R16-2"]);
 }
 { // nesting cascade: QF pick valid only if team kept in R16
-  const a = W(1);
-  const out1 = T.pruneAssign({ "R16-1": { team_id: a }, "QF-1": { team_id: a } }, go, thirds);
-  check("nested pick survives", out1["QF-1"] && out1["QF-1"].team_id === a);
+  const a = W(1);   // 2A wins M73 \u2192 R16 berth slot 1; its R16 match is M90 \u2192 QF slot 2
+  const out1 = T.pruneAssign({ "R16-1": { team_id: a }, "QF-2": { team_id: a } }, go, thirds);
+  check("nested pick survives", out1["QF-2"] && out1["QF-2"].team_id === a);
   const out2 = T.pruneAssign({ "QF-1": { team_id: a } }, go, thirds);
   check("orphan QF pick (team not in R16) cleared", !out2["QF-1"]);
 }
@@ -76,15 +93,15 @@ check("adv click stores slot", T.get().VALUES["R16-1"].team_id === W(1));
 T.onBracketAct({ dataset: { act: "adv", target: "R16-1", team: W(1) } });
 check("second click deselects", !T.get().VALUES["R16-1"]);
 // reorder group A (swap 1st/2nd) and confirm surgical cascade
-T.onBracketAct({ dataset: { act: "adv", target: "R16-1", team: id("AT0") } });
-T.onBracketAct({ dataset: { act: "adv", target: "QF-1", team: id("AT0") } });
+T.onBracketAct({ dataset: { act: "adv", target: "R16-7", team: id("AT0") } });   // 1A wins M79
+T.onBracketAct({ dataset: { act: "adv", target: "QF-4", team: id("AT0") } });    // and M92 \u2192 QF slot 4
 T.set({ BR: { go: { ...go, A: [id("AT1"), id("AT0"), id("AT2")] }, thirds: thirds.slice() } });
 T.propagateBR();
 {
   const V = T.get().VALUES;
-  // AT0 is now runner-up A → enters R32 match 9 (v winner I) → slot R16-9, QF-5
-  check("position change keeps the pick, reassigned", V["R16-9"] && V["R16-9"].team_id === id("AT0") && !V["R16-1"]);
-  check("upstream pick follows too", V["QF-5"] && V["QF-5"].team_id === id("AT0") && !V["QF-1"]);
+  // AT0 is now runner-up A \u2192 enters M73 (v runner-up B) \u2192 slot R16-1; winning M90 \u2192 QF-2
+  check("position change keeps the pick, reassigned", V["R16-1"] && V["R16-1"].team_id === id("AT0") && !V["R16-7"]);
+  check("upstream pick follows too", V["QF-2"] && V["QF-2"].team_id === id("AT0") && !V["QF-4"]);
   check("struct row reflects new order", V["group_order|A"].player_text === "AT1,AT0,AT2");
 }
 // rank tap mechanics
@@ -133,7 +150,8 @@ T.onBracketAct({ dataset: { act: "adv", target: "R16-1", team: W(1) } });
   check("render shows thirds pool", html.includes("Best thirds") && html.includes("data-act=\"third\""));
   check("render shows bracket rounds", html.includes("Round of 32") && html.includes("Final"));
   check("chosen chip marked", html.includes("bchip on") || /class="bchip on"/.test(html));
-  check("ghost feeders labeled", html.includes("M1 winner") || html.includes("R32 M1 winner"));
+  check("ghost feeders labeled with FIFA numbers", html.includes("M74 winner") && html.includes("M89 winner"));
+  check("rows labeled with FIFA match numbers", html.includes("M79") && html.includes("Final \u00b7 M104"));
   const picks = T.collectPicks();
   const struct = picks.filter((p) => p.type === "bracket_struct");
   const slots = picks.filter((p) => p.type === "bracket_slot");

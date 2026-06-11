@@ -35,20 +35,28 @@ def struct_picks(**over):
                 "player_text": over.get("thirds", "A,B,C,D,E,F,G,H")})
     return ps_
 
+# official template mirror; fixture thirds = A-H -> Annex C row 495 "HGBCAFDE"
+TOF = {"A": "H", "B": "G", "D": "B", "E": "C", "G": "A", "I": "F", "K": "D", "L": "E"}
+
 def entrants_of(k):
-    ts = sorted("ABCDEFGH")
-    if k <= 8: return [GO["ABCDEFGH"[k - 1]][0], GO[ts[k - 1]][2]]
-    if k <= 12: return [GO["IJKL"[k - 9]][0], GO["ABCD"[k - 9]][1]]
-    pairs = [("E", "F"), ("G", "H"), ("I", "J"), ("K", "L")]
-    a, b = pairs[k - 13]
-    return [GO[a][1], GO[b][1]]
+    W = lambda l: GO[l][0]; RU = lambda l: GO[l][1]; TH = lambda l: GO[TOF[l]][2]
+    return [
+        [RU("A"), RU("B")], [W("E"), TH("E")], [W("F"), RU("C")], [W("C"), RU("F")],
+        [W("I"), TH("I")], [RU("E"), RU("I")], [W("A"), TH("A")], [W("L"), TH("L")],
+        [W("D"), TH("D")], [W("G"), TH("G")], [RU("K"), RU("L")], [W("H"), RU("J")],
+        [W("B"), TH("B")], [W("J"), RU("H")], [W("K"), TH("K")], [RU("D"), RU("G")],
+    ][k - 1]
 
 def full_picks():
     picks = struct_picks()
     r16 = [entrants_of(k)[0] for k in range(1, 17)]
     for i, t in enumerate(r16):
         picks.append({"key": f"R16-{i+1}", "type": "bracket_slot", "bracket_slot": f"R16-{i+1}", "team_id": t})
-    qf = r16[::2]; sf = qf[::2]; fi = sf[::2]
+    f1 = [[2, 5], [1, 3], [4, 6], [7, 8], [11, 12], [9, 10], [14, 16], [13, 15]]
+    f2 = [[1, 2], [5, 6], [3, 4], [7, 8]]; f3 = [[1, 2], [3, 4]]
+    qf = [r16[f[0] - 1] for f in f1]
+    sf = [qf[f[0] - 1] for f in f2]
+    fi = [sf[f[0] - 1] for f in f3]
     for i, t in enumerate(qf): picks.append({"key": f"QF-{i+1}", "type": "bracket_slot", "bracket_slot": f"QF-{i+1}", "team_id": t})
     for i, t in enumerate(sf): picks.append({"key": f"SF-{i+1}", "type": "bracket_slot", "bracket_slot": f"SF-{i+1}", "team_id": t})
     for i, t in enumerate(fi): picks.append({"key": f"F-{i+1}", "type": "bracket_slot", "bracket_slot": f"F-{i+1}", "team_id": t})
@@ -67,8 +75,8 @@ bad = [{"key": "Champion", "type": "bracket_slot", "bracket_slot": "Champion", "
 raises("non-nested champion rejected", lambda: ps.bracket_guard(bad, BY_CODE), "nested")
 
 bad = full_picks()
-a, b = entrants_of(1)
-nxt = [p for p in bad if p["key"] == "R16-2"][0]; nxt["team_id"] = b
+a, b = entrants_of(16)  # both sides of M88; its winner feeds no QF pick in this fixture
+nxt = [p for p in bad if p["key"] == "R16-15"][0]; nxt["team_id"] = b
 raises("same-path hedge rejected", lambda: ps.bracket_guard(bad, BY_CODE), "same bracket path")
 
 bad = full_picks()
