@@ -179,4 +179,30 @@ T.onBracketAct({ dataset: { act: "adv", target: "R16-1", team: W(1) } });
   check("bracket gated while incomplete", html.includes("1/12 groups ordered"));
 }
 
+{ // bonus bets stay editable after the main lock (regression: 2026-06-11, "saved 0")
+  const ev = (key, role, value) => ({ target: { dataset: { key, role }, value } });
+  const META = {
+    "bonus|901|1": { type: "bonus_bet", match_id: 901, started: false },
+    "bonus|902|1": { type: "bonus_bet", match_id: 902, started: true },
+    darkhorse: { type: "dark_horse" },
+  };
+  T.set({ VALUES: {}, META, LOCKED: true });
+  T.onChange(ev("bonus|901|1", "bet_type", "btts"));
+  T.onChange(ev("bonus|901|1", "bet_value", "yes"));
+  const picks = T.collectBonusPicks();
+  check("locked: future-match bonus edit accepted and collected",
+    picks.length === 1 && picks[0].key === "bonus|901|1" &&
+    picks[0].bet_type === "btts" && picks[0].bet_value === "yes" && picks[0].match_id === 901);
+  T.onChange(ev("bonus|902|1", "bet_type", "btts"));
+  T.onChange(ev("bonus|902|1", "bet_value", "yes"));
+  check("locked: kicked-off match bonus edit ignored",
+    !T.get().VALUES["bonus|902|1"] && T.collectBonusPicks().length === 1);
+  T.onChange(ev("darkhorse", "team", "42"));
+  check("locked: non-bonus edit still ignored", !T.get().VALUES.darkhorse);
+  T.set({ LOCKED: false });
+  T.onChange(ev("darkhorse", "team", "42"));
+  check("unlocked: main edits work as before", T.get().VALUES.darkhorse.team_id === "42");
+  T.set({ VALUES: {}, META: {}, LOCKED: false });
+}
+
 summary("test_bracket_logic");

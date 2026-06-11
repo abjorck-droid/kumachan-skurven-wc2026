@@ -763,7 +763,10 @@ function updateSummary(){
 }
 
 function onChange(e){
-  const key=e.target.dataset.key, role=e.target.dataset.role; if(!key||LOCKED) return;
+  const key=e.target.dataset.key, role=e.target.dataset.role; if(!key) return;
+  // After the main lock, the bonus tab stays live (setLockedUI leaves it enabled) —
+  // accept edits ONLY for bonus-bet keys on matches that haven't kicked off.
+  if(LOCKED && !(key.startsWith("bonus|") && META[key] && META[key].type==="bonus_bet" && !META[key].started)) return;
   VALUES[key] = VALUES[key] || {};
   if(role==="team"){ VALUES[key].team_id = e.target.value || undefined; }   // bracket slots are tree-generated now; this only serves Dark Horse
   else if(role==="player"){ VALUES[key].player_id = e.target.value || undefined; }
@@ -954,7 +957,7 @@ document.addEventListener("click", e=>{
 // test hooks (stub-DOM suites drive the page through these; harmless in production)
 window.__T = { ROUNDS, ALL_SLOT_KEYS, GROUPS, slotKeyOf, buildR32, chainIdx, pruneAssign, teamOptions,
   structureComplete, syncStructValues, propagateBR, loadStructFromValues, bracketProgress,
-  renderKOContent, collectPicks, onBracketAct, countTokens,
+  renderKOContent, collectPicks, onBracketAct, countTokens, onChange, collectBonusPicks,
   groupPointsRange, groupConsistencyWarning,
   set(o){ if(o.DATA!==undefined)DATA=o.DATA; if(o.VALUES!==undefined)VALUES=o.VALUES;
           if(o.BR!==undefined)BR=o.BR; if(o.META!==undefined)META=o.META; if(o.LOCKED!==undefined)LOCKED=o.LOCKED; },
