@@ -159,6 +159,20 @@ T.onBracketAct({ dataset: { act: "adv", target: "R16-1", team: W(1) } });
   check("collect emits chosen slot", slots.length === 1 && slots[0].key === "R16-1" && String(slots[0].team_id) === W(1));
   check("struct rows carry text payloads", struct.every((p) => p.player_text && p.bracket_slot));
 }
+{ // Dark Horse eligibility filter (harness ranks: AT0=#1 ... DT3=#16, ET0=#17)
+  const html = T.renderKOContent();
+  const dh = html.slice(html.indexOf('data-key="darkhorse"'));
+  const sel = dh.slice(0, dh.indexOf("</select>"));
+  check("dark horse hides top-16 teams", !sel.includes('value="' + id("AT0") + '"') && !sel.includes('value="' + id("DT3") + '"'));
+  check("dark horse lists rank-17+ teams with rank shown", sel.includes('value="' + id("ET0") + '"') && sel.includes("(#17)"));
+  check("side-bet team dropdowns stay unfiltered", T.teamOptions(null).includes('value="' + id("AT0") + '"'));
+  T.set({ VALUES: { ...T.get().VALUES, darkhorse: { team_id: id("AT0") } } });
+  const html2 = T.renderKOContent();
+  const dh2 = html2.slice(html2.indexOf('data-key="darkhorse"'));
+  const sel2 = dh2.slice(0, dh2.indexOf("</select>"));
+  check("saved ineligible dark horse stays visible, flagged", sel2.includes('value="' + id("AT0") + '"') && sel2.includes("INELIGIBLE"));
+  T.set({ VALUES: (({ darkhorse, ...rest }) => rest)(T.get().VALUES) });
+}
 { // gate when incomplete
   T.set({ BR: { go: { A: go.A }, thirds: [] }, VALUES: {}, META: {} });
   const html = T.renderKOContent();

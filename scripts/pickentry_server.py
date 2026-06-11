@@ -141,13 +141,14 @@ def get_player(name):
     return None
 
 def bootstrap(player):
-    team_recs = at_list("Teams", fields=["team_id", "code", "name", "group"])
+    team_recs = at_list("Teams", fields=["team_id", "code", "name", "group", "fifa_ranking"])
     rec2tid = {r["id"]: r["fields"].get("team_id") for r in team_recs}
     team_by_rec = {r["id"]: {"code": r["fields"].get("code"), "group": r["fields"].get("group"),
                              "name": r["fields"].get("name"), "team_id": r["fields"].get("team_id")}
                    for r in team_recs}
     teams = [{"id": r["fields"].get("team_id"), "code": r["fields"].get("code"),
-              "name": r["fields"].get("name"), "group": r["fields"].get("group")}
+              "name": r["fields"].get("name"), "group": r["fields"].get("group"),
+              "fifa_ranking": r["fields"].get("fifa_ranking")}
              for r in team_recs if r["fields"].get("team_id") is not None]
     teams.sort(key=lambda t: (t.get("group") or "Z", t.get("name") or ""))
     side = [{"name": r["fields"].get("name"), "base_points": r["fields"].get("base_points"),

@@ -289,7 +289,7 @@ async function playerByToken(env, token) {
 // ---- handlers --------------------------------------------------------------
 async function bootstrap(env, prow) {
   const playerName = (prow.fields || {}).name;
-  const teamRecs = await atList(env, "Teams", ["team_id", "code", "name", "group"]);
+  const teamRecs = await atList(env, "Teams", ["team_id", "code", "name", "group", "fifa_ranking"]);
   const rec2tid = {}, teamByRec = {};
   for (const r of teamRecs) {
     rec2tid[r.id] = r.fields.team_id;
@@ -297,7 +297,8 @@ async function bootstrap(env, prow) {
   }
   const teams = teamRecs
     .filter((r) => r.fields.team_id != null)
-    .map((r) => ({ id: r.fields.team_id, code: r.fields.code, name: r.fields.name, group: r.fields.group }));
+    .map((r) => ({ id: r.fields.team_id, code: r.fields.code, name: r.fields.name, group: r.fields.group,
+      fifa_ranking: r.fields.fifa_ranking }));
   teams.sort((a, b) => (a.group || "Z").localeCompare(b.group || "Z") || (a.name || "").localeCompare(b.name || ""));
 
   const side = (await atList(env, "SideGames", ["name", "base_points", "resolution_type"])).map((r) => ({

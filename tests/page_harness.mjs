@@ -47,7 +47,8 @@ export function makeTeams() {
   const teams = [];
   "ABCDEFGHIJKL".split("").forEach((g, gi) => {
     for (let i = 0; i < 4; i++)
-      teams.push({ id: 100 + gi * 4 + i, code: g + "T" + i, name: "Team " + g + i, group: g });
+      teams.push({ id: 100 + gi * 4 + i, code: g + "T" + i, name: "Team " + g + i, group: g,
+        fifa_ranking: gi * 4 + i + 1 });   // ranks 1..48: groups A-D are "top 16", ET0 = #17
   });
   return teams;
 }

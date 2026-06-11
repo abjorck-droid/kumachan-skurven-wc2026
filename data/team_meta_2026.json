@@ -1,0 +1,246 @@
+{
+  "_readme": "Per-team metadata for the 48 WC2026 sides, keyed by Teams.code. kit = primary home-kit hex for UI accents (whites rendered as light grays so they read on the dark board). fifa_ranking = FIFA/Coca-Cola Men's World Ranking, 10 June 2026 pre-tournament edition - the edition that governs Dark Horse eligibility at lock (rank 17+ eligible); next FIFA update is 20 July 2026, after the tournament. vs April edition only the 16/17 boundary flipped: Uruguay up to 16 (DH ILLEGAL), USA down to 17 (DH LEGAL); other sub-boundary moves do not affect eligibility. After editing this file re-run scripts/backfill_team_meta.py to push rankings into Airtable - the pick-entry Dark Horse filter reads Teams.fifa_ranking via bootstrap.",
+  "ranking_edition": "2026-06-10",
+  "teams": {
+    "FRA": {
+      "flag": "🇫🇷",
+      "kit": "#1e3a8a",
+      "fifa_ranking": 1
+    },
+    "ESP": {
+      "flag": "🇪🇸",
+      "kit": "#c60b1e",
+      "fifa_ranking": 2
+    },
+    "ARG": {
+      "flag": "🇦🇷",
+      "kit": "#75aadb",
+      "fifa_ranking": 3
+    },
+    "ENG": {
+      "flag": "🏴󠁧󠁢󠁥󠁮󠁧󠁿",
+      "kit": "#e6e6ea",
+      "fifa_ranking": 4
+    },
+    "POR": {
+      "flag": "🇵🇹",
+      "kit": "#0a6b34",
+      "fifa_ranking": 5
+    },
+    "BRA": {
+      "flag": "🇧🇷",
+      "kit": "#ffdf00",
+      "fifa_ranking": 6
+    },
+    "NED": {
+      "flag": "🇳🇱",
+      "kit": "#ff6a00",
+      "fifa_ranking": 7
+    },
+    "MAR": {
+      "flag": "🇲🇦",
+      "kit": "#c1272d",
+      "fifa_ranking": 8
+    },
+    "BEL": {
+      "flag": "🇧🇪",
+      "kit": "#ed2939",
+      "fifa_ranking": 9
+    },
+    "GER": {
+      "flag": "🇩🇪",
+      "kit": "#9aa0a6",
+      "fifa_ranking": 10
+    },
+    "CRO": {
+      "flag": "🇭🇷",
+      "kit": "#d52b1e",
+      "fifa_ranking": 11
+    },
+    "SEN": {
+      "flag": "🇸🇳",
+      "kit": "#00853f",
+      "fifa_ranking": 13
+    },
+    "COL": {
+      "flag": "🇨🇴",
+      "kit": "#fcd116",
+      "fifa_ranking": 14
+    },
+    "MEX": {
+      "flag": "🇲🇽",
+      "kit": "#0a7d3c",
+      "fifa_ranking": 15
+    },
+    "USA": {
+      "flag": "🇺🇸",
+      "kit": "#3b5bbf",
+      "fifa_ranking": 17
+    },
+    "URU": {
+      "flag": "🇺🇾",
+      "kit": "#5b9bd5",
+      "fifa_ranking": 16
+    },
+    "SUI": {
+      "flag": "🇨🇭",
+      "kit": "#da291c",
+      "fifa_ranking": 18
+    },
+    "JPN": {
+      "flag": "🇯🇵",
+      "kit": "#1c2b6b",
+      "fifa_ranking": 19
+    },
+    "IRN": {
+      "flag": "🇮🇷",
+      "kit": "#239f40",
+      "fifa_ranking": 21
+    },
+    "TUR": {
+      "flag": "🇹🇷",
+      "kit": "#e30a17",
+      "fifa_ranking": 22
+    },
+    "KOR": {
+      "flag": "🇰🇷",
+      "kit": "#cd2e3a",
+      "fifa_ranking": 23
+    },
+    "ECU": {
+      "flag": "🇪🇨",
+      "kit": "#ffd100",
+      "fifa_ranking": 24
+    },
+    "AUT": {
+      "flag": "🇦🇹",
+      "kit": "#ef3340",
+      "fifa_ranking": 25
+    },
+    "AUS": {
+      "flag": "🇦🇺",
+      "kit": "#ffb81c",
+      "fifa_ranking": 27
+    },
+    "ALG": {
+      "flag": "🇩🇿",
+      "kit": "#006233",
+      "fifa_ranking": 28
+    },
+    "EGY": {
+      "flag": "🇪🇬",
+      "kit": "#c8102e",
+      "fifa_ranking": 29
+    },
+    "CAN": {
+      "flag": "🇨🇦",
+      "kit": "#e03c31",
+      "fifa_ranking": 30
+    },
+    "NOR": {
+      "flag": "🇳🇴",
+      "kit": "#ba0c2f",
+      "fifa_ranking": 32
+    },
+    "PAN": {
+      "flag": "🇵🇦",
+      "kit": "#d21034",
+      "fifa_ranking": 33
+    },
+    "CIV": {
+      "flag": "🇨🇮",
+      "kit": "#ff8200",
+      "fifa_ranking": 34
+    },
+    "SWE": {
+      "flag": "🇸🇪",
+      "kit": "#fecc00",
+      "fifa_ranking": 38
+    },
+    "SCO": {
+      "flag": "🏴󠁧󠁢󠁳󠁣󠁴󠁿",
+      "kit": "#0046ad",
+      "fifa_ranking": 39
+    },
+    "CZE": {
+      "flag": "🇨🇿",
+      "kit": "#d7141a",
+      "fifa_ranking": 41
+    },
+    "PAR": {
+      "flag": "🇵🇾",
+      "kit": "#cf2027",
+      "fifa_ranking": 42
+    },
+    "TUN": {
+      "flag": "🇹🇳",
+      "kit": "#e70013",
+      "fifa_ranking": 44
+    },
+    "CGO": {
+      "flag": "🇨🇩",
+      "kit": "#0085ca",
+      "fifa_ranking": 48
+    },
+    "UZB": {
+      "flag": "🇺🇿",
+      "kit": "#0099b5",
+      "fifa_ranking": 52
+    },
+    "QAT": {
+      "flag": "🇶🇦",
+      "kit": "#8a1538",
+      "fifa_ranking": 56
+    },
+    "IRQ": {
+      "flag": "🇮🇶",
+      "kit": "#007a3d",
+      "fifa_ranking": 58
+    },
+    "RSA": {
+      "flag": "🇿🇦",
+      "kit": "#ffb612",
+      "fifa_ranking": 60
+    },
+    "KSA": {
+      "flag": "🇸🇦",
+      "kit": "#006c35",
+      "fifa_ranking": 61
+    },
+    "JOR": {
+      "flag": "🇯🇴",
+      "kit": "#ad1d2c",
+      "fifa_ranking": 64
+    },
+    "BIH": {
+      "flag": "🇧🇦",
+      "kit": "#1f4096",
+      "fifa_ranking": 65
+    },
+    "CPV": {
+      "flag": "🇨🇻",
+      "kit": "#003893",
+      "fifa_ranking": 67
+    },
+    "GHA": {
+      "flag": "🇬🇭",
+      "kit": "#ce1126",
+      "fifa_ranking": 72
+    },
+    "CUR": {
+      "flag": "🇨🇼",
+      "kit": "#002b7f",
+      "fifa_ranking": 81
+    },
+    "HAI": {
+      "flag": "🇭🇹",
+      "kit": "#00209f",
+      "fifa_ranking": 83
+    },
+    "NZL": {
+      "flag": "🇳🇿",
+      "kit": "#cfd2d8",
+      "fifa_ranking": 85
+    }
+  }
+}
