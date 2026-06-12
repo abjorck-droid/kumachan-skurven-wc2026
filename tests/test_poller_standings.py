@@ -20,6 +20,7 @@ def check(label, cond):
 # ---- norm_group --------------------------------------------------------------
 check("pre-tournament naming", po.norm_group("Group A") == "A")
 check("matchday naming", po.norm_group("Group Stage - A") == "A")
+check("matchday naming (actual 2026-06-12 feed)", po.norm_group("Group Stage - Group A") == "A")
 check("last group letter", po.norm_group("Group Stage - L") == "L")
 check("thirds ranking → 3rd", po.norm_group("Ranking of third-placed teams") == "3rd")
 check("aggregate table skipped", po.norm_group("Group Stage") is None)
