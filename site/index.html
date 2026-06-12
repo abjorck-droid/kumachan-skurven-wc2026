@@ -433,6 +433,13 @@ function bonusBetLabel(v){
   const def=BONUS_TYPES.find(b=>b[0]===v.bet_type); if(!def) return "";
   return def[1].split(" · ")[0]+": "+(v.bet_value==="Yes"?def[2]:def[3]);
 }
+function localDayKey(iso){
+  // Viewer-LOCAL calendar date for grouping — slicing the ISO string groups by
+  // UTC day, which shoves e.g. a Fri 9pm ET match under the Saturday header.
+  if(!iso) return "TBD";
+  const d=new Date(iso), p=n=>String(n).padStart(2,"0");
+  return d.getFullYear()+"-"+p(d.getMonth()+1)+"-"+p(d.getDate());
+}
 function kickLabel(iso){
   if(!iso) return "TBD";
   const d=new Date(iso);
@@ -602,7 +609,7 @@ function render(){
   if(upcoming.length){
     let day=null;
     upcoming.forEach(m=>{
-      const d=(m.kickoff||"").slice(0,10);
+      const d=localDayKey(m.kickoff);
       if(d!==day){ day=d; bn+=`<div class="grp-label">${kickLabel(m.kickoff).split(" · ")[0]} <span style="color:var(--text-mute)">· ${d}</span></div>`; }
       bn += `<div class="sub" style="margin:6px 0 4px">${m.home_name||m.home_code||"?"} v ${m.away_name||m.away_code||"?"} · ${kickLabel(m.kickoff).split(" · ")[1]||""}${m.round&&!String(m.round).toLowerCase().startsWith("group")?" · "+m.round:""}</div>`;
       bn += bonusSlotRow(m,1) + bonusSlotRow(m,2);
