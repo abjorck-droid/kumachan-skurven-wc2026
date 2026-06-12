@@ -191,6 +191,8 @@
   .ttag.both{background:linear-gradient(90deg, rgba(33,158,188,0.15), rgba(251,133,0,0.13));border-color:var(--border-strong)}
   .ttag.hit{border-color:rgba(90,222,140,.5)} .ttag.hit .code{color:var(--good)}
   .ttag.miss{opacity:.45} .ttag.miss .code{text-decoration:line-through}
+  .ttag.dead{opacity:.55;border-color:rgba(255,90,90,.4)} .ttag.dead .code{text-decoration:line-through}
+  .outmark{color:var(--bad);font-family:'Antonio',sans-serif;font-size:10px;letter-spacing:.08em;text-transform:uppercase}
   .ttag.tok{border-color:rgba(232,185,72,.55)}
   .ttag .tokmark{color:var(--gold);font-size:10px}
   .ttag .pts{color:var(--gold);font-family:'Antonio',sans-serif;font-size:10px}
@@ -364,7 +366,7 @@ function indexData(D){
   var names=(D.players||[]).map(function(p){return p.name;});
   var picksBy={};
   names.forEach(function(n){ picksBy[n]={}; ((D.picks||{})[n]||[]).forEach(function(p){ picksBy[n][p.key]=p; }); });
-  return {teamById:teamById, matchById:matchById, names:names, picksBy:picksBy};
+  return {teamById:teamById, matchById:matchById, names:names, picksBy:picksBy, elim:eliminatedSet(D)};
 }
 function bracketTiers(D){
   var out={};
@@ -494,6 +496,38 @@ function ladderSets(D){
       var t=tierOfSlot(p.bracket_slot); if(!t) return;
       (out[n][t]=out[n][t]||{})[p.team_id]=p;
     });
+  });
+  return out;
+}
+function eliminatedSet(D){
+  // "Still alive" logic — conservative: a team is marked out only when it is CERTAIN.
+  //  1. Rank 4 in a finished group (all four rows played 3) — 4th never advances.
+  //  2. Rank 3 only once ALL groups are finished AND the API's third-place ranking
+  //     (group "3rd", written by the leaderboards poller) says rank > 8.
+  //  3. Lost a finished knockout match. (3rd-place playoff is harmless here:
+  //     both its teams already lost their semis.)
+  // No mid-group maths — never a false "out" while a team can still qualify.
+  var out={};
+  var groups={}, thirds=[];
+  (D.standings||[]).forEach(function(s){
+    var g=String(s.group||"");
+    if(g==="3rd") thirds.push(s);
+    else if(/^[A-L]$/.test(g)) (groups[g]=groups[g]||[]).push(s);
+  });
+  var allDone=Object.keys(groups).length===12;
+  Object.keys(groups).forEach(function(g){
+    var rs=groups[g];
+    var done=rs.length===4 && rs.every(function(s){return (s.played||0)>=3;});
+    if(!done){ allDone=false; return; }
+    rs.forEach(function(s){ if(s.rank===4) out[s.team_id]=true; });
+  });
+  if(allDone && thirds.length>=12){
+    thirds.forEach(function(s){ if((s.rank||99)>8) out[s.team_id]=true; });
+  }
+  (D.matches||[]).forEach(function(m){
+    if(m.status!=="Finished"||m.winner_id==null||!koRound(m.round)) return;
+    if(m.home_id!=null&&m.home_id!==m.winner_id) out[m.home_id]=true;
+    if(m.away_id!=null&&m.away_id!==m.winner_id) out[m.away_id]=true;
   });
   return out;
 }
@@ -692,11 +726,14 @@ function ttag(p, name){
     return q.type==="bracket_slot" && tierOfSlot(q.bracket_slot)===tierOfSlot(p.bracket_slot) && q.team_id===p.team_id;
   });
   var c="ttag"+(otherHas?" both":"")+(p.token?" tok":"");
+  var dead=!p.resolved && IDX.elim[p.team_id];   // pick still open but the team is out
   if(p.resolved) c+=(p.points>0?" hit":" miss");
+  else if(dead) c+=" dead";
   var pts=(p.points!=null&&p.resolved)?'<span class="pts">+'+(p.points+(p.rival_bonus||0))+'</span>':"";
   var note=p.note?' title="'+esc(p.note)+'"':"";
   return '<span class="'+c+'"'+note+'><span class="kit" style="background:'+(t.kit||"#444")+'"></span>'+
-    '<span class="code">'+esc(t.code||t.name||"?")+'</span>'+tokmark(p.token)+pts+'</span>';
+    '<span class="code">'+esc(t.code||t.name||"?")+'</span>'+tokmark(p.token)+pts+
+    (dead?'<span class="outmark">✕ out</span>':'')+'</span>';
 }
 
 function ladderHTML(){
@@ -741,9 +778,11 @@ function darkHorseHTML(){
     var pl=pair[0];
     var p=pl.locked?(IDX.picksBy[pl.name]||{})["darkhorse"]:null;
     var t=p?(IDX.teamById[p.team_id]||{}):{};
+    var dhOut=p&&IDX.elim[p.team_id];
     h+='<div class="dhcard '+pair[1]+'"><div class="who">'+esc(pl.name)+'</div>'+
-       '<div class="tm">'+(pl.locked?(t.flag?esc(t.flag)+" ":"")+esc(t.code||"—"):"hidden")+'</div>'+
-       (t.name?'<div class="lad">'+esc(t.name)+(p&&p.token?" · "+p.token:"")+(p&&p.points!=null?' · +'+p.points+' so far':'')+'</div>':"")+
+       '<div class="tm">'+(pl.locked?(t.flag?esc(t.flag)+" ":"")+esc(t.code||"—"):"hidden")+
+       (dhOut?' <span class="outmark">✕ out</span>':'')+'</div>'+
+       (t.name?'<div class="lad">'+esc(t.name)+(p&&p.token?" · "+p.token:"")+(p&&p.points!=null?' · +'+p.points+(dhOut?" — final":" so far"):'')+'</div>':"")+
        '</div>';
   });
   return h+'</div>';
