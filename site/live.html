@@ -301,6 +301,7 @@
   table.st tr:last-child td{border-bottom:none}
   table.st td.tm{font-family:'Antonio',sans-serif;font-weight:600;letter-spacing:.04em;font-size:13px}
   table.st td.ptscol{color:var(--gold);font-weight:600}
+  table.st tr.cut td{border-bottom:2px solid var(--accent)} /* qualification line in the thirds table */
 
   @media (max-width:680px){
     .mrow{grid-template-columns:1fr 70px;grid-template-areas:"teams mid" "picks picks"}
@@ -966,21 +967,36 @@ function sideTab(){
 
 function standingsTab(){
   var h='<h2>Group standings</h2><div class="sub">Straight from the official tables, refreshed daily (15-minutely on match days).</div>';
-  if(!(D.standings||[]).length) return h+'<div class="notice">Standings appear once the group stage starts.</div>';
-  var byGroup={};
-  D.standings.forEach(function(s){ var g=s.group||"?"; (byGroup[g]=byGroup[g]||[]).push(s); });
+  // Poller normalizes groups to A–L plus "3rd" (third-place ranking) and prunes
+  // stale rows; the filter here is belt-and-braces against any future API rename.
+  var byGroup={}, thirds=[];
+  (D.standings||[]).forEach(function(s){
+    var g=String(s.group||"");
+    if(g==="3rd") thirds.push(s);
+    else if(/^[A-L]$/.test(g)) (byGroup[g]=byGroup[g]||[]).push(s);
+  });
+  if(!Object.keys(byGroup).length) return h+'<div class="notice">Standings appear once the group stage starts.</div>';
+  function strow(s,extra,pre){
+    var t=IDX.teamById[s.team_id]||{};
+    return '<tr'+(extra||'')+'><td class="tm">'+(pre||'')+(t.flag?esc(t.flag)+" ":"")+esc(t.code||t.name||"?")+'</td><td>'+(s.played!=null?s.played:0)+'</td>'+
+       '<td>'+(s.win!=null?s.win:0)+'</td><td>'+(s.draw!=null?s.draw:0)+'</td><td>'+(s.loss!=null?s.loss:0)+'</td>'+
+       '<td>'+(s.gd!=null?s.gd:0)+'</td><td class="ptscol">'+(s.points!=null?s.points:0)+'</td></tr>';
+  }
   h+='<div class="stgrid">';
   Object.keys(byGroup).sort().forEach(function(g){
     h+='<table class="st"><caption>Group '+esc(g)+'</caption>'+
        '<tr><th class="tm">Team</th><th>P</th><th>W</th><th>D</th><th>L</th><th>GD</th><th>Pts</th></tr>';
-    byGroup[g].sort(function(a,b){return (a.rank||99)-(b.rank||99);}).forEach(function(s){
-      var t=IDX.teamById[s.team_id]||{};
-      h+='<tr><td class="tm">'+(t.flag?esc(t.flag)+" ":"")+esc(t.code||t.name||"?")+'</td><td>'+(s.played!=null?s.played:0)+'</td>'+
-         '<td>'+(s.win!=null?s.win:0)+'</td><td>'+(s.draw!=null?s.draw:0)+'</td><td>'+(s.loss!=null?s.loss:0)+'</td>'+
-         '<td>'+(s.gd!=null?s.gd:0)+'</td><td class="ptscol">'+(s.points!=null?s.points:0)+'</td></tr>';
-    });
+    byGroup[g].sort(function(a,b){return (a.rank||99)-(b.rank||99);}).forEach(function(s){ h+=strow(s); });
     h+='</table>';
   });
+  if(thirds.length){
+    h+='<table class="st"><caption>Third-place ranking · top 8 advance</caption>'+
+       '<tr><th class="tm">Team</th><th>P</th><th>W</th><th>D</th><th>L</th><th>GD</th><th>Pts</th></tr>';
+    thirds.sort(function(a,b){return (a.rank||99)-(b.rank||99);}).forEach(function(s,i){
+      h+=strow(s, i===7?' class="cut"':'', (s.rank?s.rank+'. ':''));
+    });
+    h+='</table>';
+  }
   return h+'</div>';
 }
 
@@ -1073,6 +1089,9 @@ function demoData(){
     {group:"A",rank:4,team_id:2,played:1,win:0,draw:0,loss:1,gf:1,ga:2,gd:-1,points:0,form:"L"},
     {group:"B",rank:1,team_id:5,played:1,win:0,draw:1,loss:0,gf:1,ga:1,gd:0,points:1,form:"D"},
     {group:"B",rank:2,team_id:6,played:1,win:0,draw:1,loss:0,gf:1,ga:1,gd:0,points:1,form:"D"},
+    {group:"3rd",rank:1,team_id:4,played:1,win:0,draw:1,loss:0,gd:0,points:1},
+    {group:"3rd",rank:2,team_id:7,played:1,win:0,draw:0,loss:1,gd:-1,points:0},
+    {group:"3rd",rank:3,team_id:2,played:1,win:0,draw:0,loss:1,gf:1,ga:2,gd:-1,points:0,form:"L"},
   ];
   var sideGames=[
     {name:"Golden Boot",base_points:60,resolution_type:"player",resolved_value:null},

@@ -16,7 +16,7 @@ Keyed writes use Airtable's native upsert (fieldsToMergeOn), so it is safe to ru
 
 Stdlib only. Schema per 02_Airtable_schema.md (events stored as JSON in Matches).
 """
-import argparse, json, os, sys, time, datetime as dt, urllib.request, urllib.error, urllib.parse
+import argparse, json, os, re, sys, time, datetime as dt, urllib.request, urllib.error, urllib.parse
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -123,6 +123,19 @@ def at_upsert(base, table, pat, records, merge_on, dry=False):
         n += len(batch)
     return n
 
+def at_delete(base, table, pat, rec_ids, dry=False):
+    """Delete records by id in batches of 10."""
+    n = 0
+    for i in range(0, len(rec_ids), 10):
+        batch = rec_ids[i:i + 10]
+        if dry:
+            n += len(batch); continue
+        q = urllib.parse.urlencode([("records[]", rid) for rid in batch])
+        at_request("DELETE", f"{base}/{urllib.parse.quote(table)}?{q}", pat)
+        time.sleep(WRITE_PAUSE)
+        n += len(batch)
+    return n
+
 def at_create(base, table, pat, fields, dry=False):
     if dry:
         return
@@ -164,11 +177,29 @@ def to_match_fields(fx, team_map, now_iso):
             rec["winner"] = [team_map[win_id]]
     return {k: v for k, v in rec.items() if v is not None}
 
-def to_standing_fields(row, group_name, team_map):
+def norm_group(gname):
+    """Normalize API-Football's standings group naming to a stable key.
+
+    The feed renamed its tables when play started ("Group A" pre-tournament →
+    "Group Stage - A" on matchday 1), which orphaned every label-keyed row and
+    duplicated the tables on the live board (seen 2026-06-12). Reduce any
+    variant ending in the group letter to "A".."L", map the third-place
+    ranking to "3rd" (it drives R32 qualification), and return None for
+    anything else (aggregate tables we don't track).
+    """
+    g = (gname or "").strip()
+    if "third" in g.lower():
+        return "3rd"
+    m = re.search(r"\b([A-L])$", g)
+    return m.group(1) if m else None
+
+def to_standing_fields(row, group_key, team_map):
+    """group_key is the normalized key from norm_group() — never the raw API string,
+    so the upsert label survives any future API renaming."""
     tid = row["team"]["id"]
     rec = {
-        "label": f"{group_name}:{tid}",
-        "group": group_name.replace("Group ", "").strip(),
+        "label": f"{group_key}:{tid}",
+        "group": group_key,
         "rank": row.get("rank"),
         "played": (row.get("all") or {}).get("played"),
         "win": (row.get("all") or {}).get("win"),
@@ -287,13 +318,26 @@ def run_leaderboards(keys, dry, force):
     body, remaining = api_get("standings", key, league=LEAGUE, season=SEASON); calls += 1
     resp = body.get("response", [])
     groups = (resp[0]["league"]["standings"] if resp else [])
-    records = []
+    records = []; skipped = set()
     for table in groups:                       # each group is a list of rows
         for row in table:
-            gname = row.get("group") or "Group ?"
-            records.append(to_standing_fields(row, gname, team_map))
+            g = norm_group(row.get("group"))
+            if g is None:                      # aggregate tables we don't track
+                skipped.add(row.get("group") or "?"); continue
+            records.append(to_standing_fields(row, g, team_map))
+    if skipped:
+        print(f"· skipped API tables: {sorted(skipped)}")
     touched = at_upsert(base, "Standings", pat, records, ["label"], dry=dry) if records else 0
     print(f"· upserted {touched} Standings rows{' (dry)' if dry else ''}")
+    # Self-heal: prune rows whose label the API no longer publishes (e.g. after the
+    # group-name rename above). Guarded so an empty API response never wipes the table.
+    if records:
+        keep = {r["label"] for r in records}
+        stale = [rec["id"] for rec in at_list(base, "Standings", pat, fields=["label"])
+                 if (rec.get("fields", {}).get("label") or "") not in keep]
+        if stale:
+            pruned = at_delete(base, "Standings", pat, stale, dry=dry)
+            print(f"· pruned {pruned} stale Standings rows{' (dry)' if dry else ''}")
     write_poll_log(base, pat, "leaderboards-poll", calls, remaining, touched, " | ".join(errors), dry)
     print(f"· done. api calls: {calls}, rate-limit remaining: {remaining}")
 
