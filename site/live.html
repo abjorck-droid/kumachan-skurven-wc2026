@@ -163,6 +163,13 @@
   .bline .blab{font-family:'Antonio',sans-serif;font-size:9.5px;letter-spacing:.12em;
     text-transform:uppercase;color:var(--text-mute)}
 
+  /* scoreboard top row: category breakdown (narrow) beside latest results */
+  .toprow{display:grid;grid-template-columns:340px 1fr;gap:18px;align-items:start;margin-bottom:10px}
+  .toprow .cardgrid{grid-template-columns:repeat(auto-fill,minmax(340px,1fr))}
+  .toprow .placeholder{background:var(--card);border:1px dashed var(--border);border-radius:8px;
+    padding:18px 16px;color:var(--text-mute);font-size:13px;margin-top:14px}
+  @media (max-width:880px){ .toprow{grid-template-columns:1fr} }
+
   /* scoreboard category table */
   .cats{display:grid;grid-template-columns:1fr auto auto;gap:0;background:var(--card);border:1px solid var(--border);
     border-radius:8px;overflow:hidden;margin-top:14px}
@@ -641,18 +648,23 @@ function boardTab(){
   var fin=D.matches.filter(function(m){return m.status==="Finished";});
   var up=D.matches.filter(function(m){return m.status!=="Finished"&&m.status!=="Live";});
   if(live.length){ h+='<h2>Live now</h2><div class="cardgrid">'+live.map(matchCard).join("")+'</div>'; }
-  if(up.length){ h+='<h2>Up next</h2><div class="cardgrid">'+up.slice(0,4).map(matchCard).join("")+'</div>'; }
-  if(fin.length){ h+='<h2>Latest results</h2><div class="cardgrid">'+fin.slice(-4).reverse().map(matchCard).join("")+'</div>'; }
 
+  // Top row: points-by-category (narrow) beside latest results; Up next below.
   var cats=categoryTotals(D);
   var c1=cats[P1().name]||{}, c2=cats[P2().name]||{};
-  h+='<h2>Points by category</h2>';
-  h+='<div class="cats">'+
+  var catBox='<h2>Points by category</h2>'+
+    '<div class="cats">'+
     '<div class="hd">Category</div><div class="hd num c1">'+esc(P1().name)+'</div><div class="hd num c2">'+esc(P2().name)+'</div>';
   [["Match picks","match"],["Bracket ladder","bracket"],["Side games","side"],["Dark Horse","dark"],["Bonus bets","bonus"],["Beat-rival bonus","rival"]].forEach(function(r){
-    h+='<div>'+r[0]+'</div><div class="num c1">'+(c1[r[1]]||0)+'</div><div class="num c2">'+(c2[r[1]]||0)+'</div>';
+    catBox+='<div>'+r[0]+'</div><div class="num c1">'+(c1[r[1]]||0)+'</div><div class="num c2">'+(c2[r[1]]||0)+'</div>';
   });
-  h+='<div class="tot">Total</div><div class="num c1 tot">'+(c1.total||0)+'</div><div class="num c2 tot">'+(c2.total||0)+'</div></div>';
+  catBox+='<div class="tot">Total</div><div class="num c1 tot">'+(c1.total||0)+'</div><div class="num c2 tot">'+(c2.total||0)+'</div></div>';
+  var finBox='<h2>Latest results</h2>'+(fin.length
+    ? '<div class="cardgrid">'+fin.slice(-4).reverse().map(matchCard).join("")+'</div>'
+    : '<div class="placeholder">Results land here after the first final whistle.</div>');
+  h+='<div class="toprow"><div>'+catBox+'</div><div>'+finBox+'</div></div>';
+
+  if(up.length){ h+='<h2>Up next</h2><div class="cardgrid">'+up.slice(0,4).map(matchCard).join("")+'</div>'; }
   return h;
 }
 
