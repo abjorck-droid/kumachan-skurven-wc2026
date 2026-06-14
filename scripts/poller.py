@@ -215,6 +215,21 @@ def to_standing_fields(row, group_key, team_map):
         rec["team"] = [team_map[tid]]
     return {k: v for k, v in rec.items() if v is not None}
 
+def poll_dates(utc_today, target_date=None):
+    """UTC dates to query in one scoreboard run.
+
+    The API buckets each fixture under its kickoff's UTC date, and a single-date
+    query drops a match the instant the UTC day rolls over — so a game still in
+    progress at 00:00 UTC freezes at its last-seen Live minute and never records
+    full time (seen 2026-06-13: BRA v MAR, 22:00 UTC kickoff, stuck at 81'). The
+    automated run therefore polls yesterday AND today; re-touching yesterday's
+    now-final fixtures is harmless (idempotent upsert keyed on fixture_id, events
+    already stored). An explicit --date polls only that one day, for backfills.
+    """
+    if target_date:
+        return [target_date]
+    return [utc_today - dt.timedelta(days=1), utc_today]
+
 # ---- shared ----------------------------------------------------------------
 def build_team_map(base, pat):
     """team_id (API-Football) -> Airtable record id, from the seeded Teams table."""
@@ -243,21 +258,30 @@ def write_poll_log(base, pat, workflow, calls, remaining, touched, errors, dry):
 # ---- modes -----------------------------------------------------------------
 def run_scoreboard(keys, target_date, dry, force):
     base, pat, key = keys["AIRTABLE_BASE_ID"], keys["AIRTABLE_PAT"], keys["API_FOOTBALL_KEY"]
-    today = target_date or dt.datetime.utcnow().date()
+    utc_today = dt.datetime.utcnow().date()
+    today = target_date or utc_today
     if not force and not (TOURN_START - dt.timedelta(days=3) <= today <= TOURN_END + dt.timedelta(days=2)):
         print(f"· {today} is outside the tournament window — skipping (use --force to override)."); return
     calls = 0; errors = []
+    remaining = None
     now_iso = dt.datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
 
     team_map = build_team_map(base, pat)
     print(f"· team map: {len(team_map)} teams")
 
-    fx_body, remaining = api_get("fixtures", key, league=LEAGUE, season=SEASON, date=today.isoformat())
-    calls += 1
-    fixtures = fx_body.get("response", [])
-    print(f"· {today}: {len(fixtures)} fixtures")
-    if fx_body.get("errors"):
-        errors.append(f"fixtures errors: {fx_body['errors']}")
+    # Poll yesterday+today (UTC) on the automated run so a match still live at the
+    # UTC date rollover still gets its final status — see poll_dates() for the why.
+    by_fid = {}
+    for d in poll_dates(utc_today, target_date):
+        fx_body, remaining = api_get("fixtures", key, league=LEAGUE, season=SEASON, date=d.isoformat())
+        calls += 1
+        day_fx = fx_body.get("response", [])
+        print(f"· {d}: {len(day_fx)} fixtures")
+        if fx_body.get("errors"):
+            errors.append(f"fixtures errors ({d}): {fx_body['errors']}")
+        for fx in day_fx:                  # date buckets are disjoint; dedupe defensively
+            by_fid[fx["fixture"]["id"]] = fx
+    fixtures = list(by_fid.values())
 
     records = [to_match_fields(fx, team_map, now_iso) for fx in fixtures]
     touched = at_upsert(base, "Matches", pat, records, ["fixture_id"], dry=dry) if records else 0
