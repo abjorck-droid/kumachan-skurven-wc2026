@@ -193,6 +193,11 @@
   .ttag.miss{opacity:.45} .ttag.miss .code{text-decoration:line-through}
   .ttag.dead{opacity:.55;border-color:rgba(255,90,90,.4)} .ttag.dead .code{text-decoration:line-through}
   .outmark{color:var(--bad);font-family:'Antonio',sans-serif;font-size:10px;letter-spacing:.08em;text-transform:uppercase}
+  .bk-slot.lost .code{text-decoration:line-through;opacity:.65}
+  .bk-slot .outmark{margin-left:4px}
+  .bk-champ .tm.dead,.bk-champ .team.dead{text-decoration:line-through}
+  .bk-champ .outmark{text-decoration:none;display:inline-block}
+  .bk-deadnote{font-size:12px;color:var(--text-dim);margin:-2px 0 10px}
   .ttag.tok{border-color:rgba(232,185,72,.55)}
   .ttag .tokmark{color:var(--gold);font-size:10px}
   .ttag .pts{color:var(--gold);font-family:'Antonio',sans-serif;font-size:10px}
@@ -531,6 +536,16 @@ function eliminatedSet(D){
   });
   return out;
 }
+function deadPickCount(D, elim){
+  // open (unresolved) bracket + dark-horse picks that can no longer score
+  var n=0;
+  Object.keys(D.picks||{}).forEach(function(name){
+    (D.picks[name]||[]).forEach(function(p){
+      if((p.type==="bracket_slot"||p.type==="dark_horse") && p.team_id!=null && !p.resolved && elim[p.team_id]) n++;
+    });
+  });
+  return n;
+}
 /* ====================== PURE-END ====================== */
 
 var D=null, IDX=null, ACTIVE="board", LAST_FETCH=0;
@@ -823,19 +838,23 @@ function bkChip(no, opts){
     var tid=m?(i===0?m.home_id:m.away_id):null;
     var t=tid!=null?(IDX.teamById[tid]||{}):null;
     var code=t?(t.code||"?"):"·"; var kit=t?(t.kit||"#444"):"#23262f";
-    var pcls="dim";
+    var pcls="dim", inA=null, inC=null;
     if(t&&tier){
       var sA=(LSETS[P1().name]||{})[tier]||{}, sC=(LSETS[P2().name]||{})[tier]||{};
-      var inA=sA[tid], inC=sC[tid];
+      inA=sA[tid]; inC=sC[tid];
       if(BRK_MODE==="A") pcls=inA?"pa":"dim";
       else if(BRK_MODE==="C") pcls=inC?"pc":"dim";
       else pcls=(inA&&inC)?"pboth":inA?"pa":inC?"pc":"dim";
       if(inA&&inA.token&&(BRK_MODE==="A"||BRK_MODE==="H")) tokTags.push({by:"a",label:tokenName(inA.token)});
       if(inC&&inC.token&&(BRK_MODE==="C"||BRK_MODE==="H")) tokTags.push({by:"c",label:tokenName(inC.token)});
     }
-    var won=(m&&m.status==="Finished"&&m.winner_id!=null&&tid===m.winner_id)?'<span class="won">✓</span>':"";
-    rows+='<div class="bk-slot '+pcls+'"><span class="kit" style="background:'+kit+'"></span>'+
-      '<span class="code">'+(t&&t.flag?esc(t.flag)+" ":"")+esc(code)+won+'</span><span class="src">'+esc(src)+'</span></div>';
+    var fin=m&&m.status==="Finished"&&m.winner_id!=null;
+    var won=(fin&&tid===m.winner_id)?'<span class="won">✓</span>':"";
+    var lost=fin&&tid!=null&&tid!==m.winner_id;
+    var pickDead=lost&&((inA&&!inA.resolved)||(inC&&!inC.resolved)); // someone picked this team to advance — pick is dead
+    rows+='<div class="bk-slot '+pcls+(lost?" lost":"")+'"><span class="kit" style="background:'+kit+'"></span>'+
+      '<span class="code">'+(t&&t.flag?esc(t.flag)+" ":"")+esc(code)+won+
+      (pickDead?'<span class="outmark">✕</span>':"")+'</span><span class="src">'+esc(src)+'</span></div>';
   }
   var tok=tokTags.length?'<span class="bk-tok">'+tokTags.map(function(t){
     return '<i class="ow '+t.by+'"></i>'+esc(t.label);}).join(" ")+'</span>':"";
@@ -846,14 +865,16 @@ function bkChampion(){
   var tA=pA?(IDX.teamById[pA.team_id]||{}):{}, tC=pC?(IDX.teamById[pC.team_id]||{}):{};
   var ca=pA?((tA.flag?tA.flag+" ":"")+(tA.code||"—")):"—";
   var cc=pC?((tC.flag?tC.flag+" ":"")+(tC.code||"—")):"—";
+  var dA=pA&&!pA.resolved&&IDX.elim[pA.team_id], dC=pC&&!pC.resolved&&IDX.elim[pC.team_id];
+  var mark='<span class="outmark">✕ out</span>';
   if(BRK_MODE==="H"){
     return '<div class="bk-champ"><div class="trophy">♛</div><div class="lab">Predicted Champion</div>'+
-      '<div class="cmp"><div class="rw a"><span class="who">'+esc(P1().name)+'</span><span class="tm">'+esc(ca)+'</span></div>'+
-      '<div class="rw c"><span class="who">'+esc(P2().name)+'</span><span class="tm">'+esc(cc)+'</span></div></div></div>';
+      '<div class="cmp"><div class="rw a"><span class="who">'+esc(P1().name)+'</span><span class="tm'+(dA?" dead":"")+'">'+esc(ca)+(dA?" "+mark:"")+'</span></div>'+
+      '<div class="rw c"><span class="who">'+esc(P2().name)+'</span><span class="tm'+(dC?" dead":"")+'">'+esc(cc)+(dC?" "+mark:"")+'</span></div></div></div>';
   }
-  var team=BRK_MODE==="A"?ca:cc, col=BRK_MODE==="A"?"var(--p1)":"var(--p2)";
+  var team=BRK_MODE==="A"?ca:cc, col=BRK_MODE==="A"?"var(--p1)":"var(--p2)", dead=BRK_MODE==="A"?dA:dC;
   return '<div class="bk-champ"><div class="trophy">♛</div><div class="lab">Predicted Champion</div>'+
-    '<div class="team" style="color:'+col+'">'+esc(team)+'</div></div>';
+    '<div class="team'+(dead?" dead":"")+'" style="color:'+col+'">'+esc(team)+(dead?" "+mark:"")+'</div></div>';
 }
 function bkBuildTree(){
   var bracket=document.getElementById("bk-bracket");
@@ -963,6 +984,9 @@ function bracketTab(){
           '<button data-bkzoom="full" class="'+(BRK_ZOOM==="full"?"on mz":"")+'">100%</button></div>'
       : '')+
     '</div>'+(view==="tree"?'<div class="bk-legend">'+legend+'</div>':'')+'</div>';
+  var nDead=deadPickCount(D, IDX.elim);
+  if(nDead) h+='<div class="bk-deadnote"><span class="outmark">✕</span> '+nDead+' pick'+(nDead===1?"":"s")+
+    ' can no longer score'+(view==="tree"?' — struck out in the Ladders view':'')+'</div>';
   if(view==="tree"){
     if(!hasKO) h+='<div class="notice">Knockout fixtures aren’t drawn yet (~June 26). The tree shows the official template — '+
       'sources like “W E” and “3rd A/B/C/D/F” — and fills in as the draw lands. Ladder picks light up once teams are known.</div>';

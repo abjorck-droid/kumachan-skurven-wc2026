@@ -42,14 +42,25 @@ when mathematically certain.** Rules: (1) rank 4 in a finished group (all four r
 table → no third marked out; (3) lost a finished knockout match (3rd-place playoff harmless —
 both teams already out). No mid-group maths, so no false positives while a team can still qualify.
 
-Surfaced as: red strikethrough + "✕ out" chip on unresolved bracket-ladder picks (`ttag`, class
-`.dead`; resolved picks keep hit/miss styling untouched), and "✕ out" + "+N — final" on a dead
-Dark Horse card. **Not yet on the knockout tree view** (`bkMount`) — candidate for the June window.
-Tests: `tests/test_live_alive.mjs` (17 checks) — extracts the PURE block from live.html via the
-PURE-START/PURE-END markers; first test coverage for live.html logic, pattern reusable.
+Surfaced everywhere on the Brackets tab:
 
-Full suite: 145/145 across 6 files (test_api_save 22, test_bracket_logic 57, test_consistency 13,
-test_live_alive 17, test_poller_standings 17, test_pickentry_guard 19).
+- **Ladders** (`ttag`): red strikethrough + "✕ out" chip on unresolved picks; resolved picks keep
+  hit/miss styling untouched.
+- **Tree + narrow stack** (`bkChip`): losers of finished KO matches are struck; a "✕" is added
+  when a player had picked that team to advance and the pick is still open. Champion box
+  (`bkChampion`) strikes a dead picked champion with "✕ out" in all three modes. Note the tree
+  can only mark dead picks on teams that appear in real fixtures — a team eliminated in an
+  earlier round never reaches the later chip, so the per-tier truth lives in the Ladders view.
+- **Both views**: a `bk-deadnote` line under the toolbar — "✕ N picks can no longer score" —
+  via pure `deadPickCount()` (counts open bracket_slot + dark_horse picks on eliminated teams),
+  pointing at the Ladders view from the tree. Dark Horse card shows "✕ out" + "+N — final".
+
+Tests: `tests/test_live_alive.mjs` (25 checks) — extracts the PURE block from live.html via the
+PURE-START/PURE-END markers, plus `bkChip`/`bkChampion` rendering via function extraction; first
+test coverage for live.html logic, pattern reusable.
+
+Full suite: 153/153 across 6 files (test_api_save 22, test_bracket_logic 57, test_consistency 13,
+test_live_alive 25, test_poller_standings 17, test_pickentry_guard 19).
 
 ## Outstanding (carried)
 
@@ -61,7 +72,7 @@ test_live_alive 17, test_poller_standings 17, test_pickentry_guard 19).
    also unused `Stage - A`…`Stage - L`; a `3rd` option appears via typecast when thirds return),
    `PoolPlayers.display_color`, Cal's magic link.
 4. **June 26–28**: mulligan mechanics; knockout fixtures via `load_fixtures.py`; round names into
-   `ROUND_TIER_OVERRIDES`; `site/bracket_map_2026.json`; still-alive on the bracket tree.
+   `ROUND_TIER_OVERRIDES`; `site/bracket_map_2026.json` (still-alive tree marking is done).
 5. Own-goal attribution sanity check on first real own goal.
 
 ## Gotchas (unchanged from morning handoff)
@@ -73,5 +84,5 @@ edge cache 60 s (`?cb=` to bust); four bracket-template mirrors must stay in syn
 
 ## What I'd do first next session
 
-Check the June 24 reminder outcome if past that date. Otherwise: bracket-tree still-alive
-marking, or the hardening items. Mulligan mechanics need agreeing with Cal before June 26.
+Check the June 24 reminder outcome if past that date. Otherwise: the hardening items.
+Mulligan mechanics need agreeing with Cal before June 26.

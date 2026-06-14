@@ -84,5 +84,56 @@ check("3rd-place playoff adds nothing new", elim[105] && elim[120] && !elim[101]
 elim = T.eliminatedSet({ standings: [], matches: [{ round: "Final", home_id: 101, away_id: 110, winner_id: 110, status: "Finished", winner_method: "Penalties", home_score: 1, away_score: 1 }] });
 check("penalty-shootout loser out", elim[101] === true && !elim[110]);
 
+// ---- deadPickCount -------------------------------------------------------------
+const picksD = {
+  Andreas: [
+    { type: "bracket_slot", bracket_slot: "SF-1", team_id: 1 },            // dead (open, team out)
+    { type: "bracket_slot", bracket_slot: "QF-1", team_id: 1, resolved: true, points: 0 }, // resolved → not counted
+    { type: "bracket_slot", bracket_slot: "SF-2", team_id: 5 },            // alive
+    { type: "dark_horse", team_id: 9 },                                    // dead
+    { type: "match_outcome", match_id: 7, team_id: 1 },                    // wrong type → not counted
+  ],
+  Cal: [{ type: "bracket_slot", bracket_slot: "Champion", team_id: 1 }],   // dead
+};
+check("deadPickCount counts open bracket+DH picks on out teams",
+  T.deadPickCount({ picks: picksD }, { 1: true, 9: true }) === 3);
+check("deadPickCount zero when nobody out", T.deadPickCount({ picks: picksD }, {}) === 0);
+
+// ---- tree-view rendering (bkChip / bkChampion, extracted with stub globals) -----
+function grab(name) {
+  const mm = html.match(new RegExp("function " + name + "\\(([^)]*)\\)\\{[\\s\\S]*?\\n\\}"));
+  if (!mm) throw new Error("could not extract " + name);
+  return mm[0];
+}
+const tree = {
+  esc: s => String(s == null ? "" : s), tokenName: t => t,
+  P1: () => ({ name: "Andreas" }), P2: () => ({ name: "Cal" }),
+  BRK_MODE: "H",
+  BR_SRC: { 101: ["W97", "W98"] },
+  NEXT_TIER: { r32: "R16", r16: "QF", qf: "SF", sf: "Finalist", f: "Champion" },
+  numRound: () => "sf",
+  KOIDX: { 101: { status: "Finished", winner_id: 5, home_id: 5, away_id: 1 } },
+  LSETS: { Andreas: { Finalist: { 1: { team_id: 1 } } }, Cal: {} },     // Andreas picked the loser to advance
+  IDX: { teamById: { 5: { code: "ESP", kit: "#a00" }, 1: { code: "MEX", kit: "#0a5" } },
+         picksBy: { Andreas: { Champion: { team_id: 1 } }, Cal: { Champion: { team_id: 5 } } },
+         elim: { 1: true } },
+};
+vm.createContext(tree);
+vm.runInContext(grab("bkChip") + "\n" + grab("bkChampion"), tree, { filename: "live.html#tree" });
+
+const chip = vm.runInContext("bkChip(101)", tree);
+const slots = chip.split("bk-slot").slice(1);            // [winner slot, loser slot]
+check("tree chip: winner slot has ✓, no strike", slots[0].includes("✓") && !slots[0].includes("lost"));
+check("tree chip: loser slot struck", /^[^>]*lost/.test(slots[1]));
+check("tree chip: dead pick gets ✕", slots[1].includes("✕") && !slots[0].includes("✕"));
+const champ = vm.runInContext("bkChampion()", tree);
+check("champion box: dead pick marked", champ.includes("✕ out") && /tm dead/.test(champ));
+check("champion box: live pick clean", champ.split('rw c')[1].indexOf("✕") === -1);
+
+const tree2 = Object.assign({}, tree, { KOIDX: { 101: { status: "Live", winner_id: null, home_id: 5, away_id: 1 } } });
+vm.createContext(tree2);
+vm.runInContext(grab("bkChip"), tree2, { filename: "live.html#tree2" });
+check("tree chip: live match — no strike, no ✕", !vm.runInContext("bkChip(101)", tree2).includes("lost"));
+
 console.log(`test_live_alive: ${PASS}/${PASS + FAIL} checks passed`);
 process.exit(FAIL ? 1 : 0);
