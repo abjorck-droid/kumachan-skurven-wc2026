@@ -338,6 +338,7 @@
   <button data-tab="bracket">Brackets</button>
   <button data-tab="side">Side bets</button>
   <button data-tab="standings">Standings</button>
+  <button data-tab="scorers">Top scorers</button>
 </div></div>
 
 <div class="wrap">
@@ -1063,9 +1064,28 @@ function standingsTab(){
   return h+'</div>';
 }
 
+function scorersTab(){
+  var h='<h2>Top scorers</h2><div class="sub">Goals counted from match events, refreshed live. Assists break ties, FIFA-style — the same tally that settles the Golden Boot and per-group top-scorer bets.</div>';
+  var sc=(D.scorers||[]).filter(function(s){return (s.goals||0)>0;});
+  if(!sc.length) return h+'<div class="notice">No goals yet — the board fills in as matches are played.</div>';
+  // server sorts goals → assists → name; re-sort defensively in case the feed order shifts.
+  sc=sc.slice().sort(function(a,b){return (b.goals-a.goals)||(b.assists-a.assists)||String(a.name||"").localeCompare(String(b.name||""));});
+  h+='<div class="stgrid"><table class="st"><caption>Golden Boot race</caption>'+
+     '<tr><th>#</th><th class="tm">Player</th><th class="tm">Team</th><th>G</th><th>A</th></tr>';
+  var rank=0, prevG=null;
+  sc.forEach(function(s,i){
+    if(s.goals!==prevG){ rank=i+1; prevG=s.goals; }   // ties share a place, next place skips (1,2,2,4)
+    var t=s.team_id!=null?(IDX.teamById[s.team_id]||{}):{};
+    var team=(t.flag?esc(t.flag)+" ":"")+esc(s.team_code||t.code||t.name||"?");
+    h+='<tr><td>'+rank+'</td><td class="tm">'+esc(s.name||"?")+'</td>'+
+       '<td class="tm">'+team+'</td><td class="ptscol">'+(s.goals||0)+'</td><td>'+(s.assists||0)+'</td></tr>';
+  });
+  return h+'</table></div>';
+}
+
 function render(){
   header();
-  var fn={board:boardTab, matches:matchesTab, bracket:bracketTab, side:sideTab, standings:standingsTab}[ACTIVE];
+  var fn={board:boardTab, matches:matchesTab, bracket:bracketTab, side:sideTab, standings:standingsTab, scorers:scorersTab}[ACTIVE];
   $("#app").innerHTML='<div class="tabpanel active">'+fn()+'</div>';
   if(ACTIVE==="bracket"){
     var hasKO=(D.matches||[]).some(function(m){return koRound(m.round);});
@@ -1198,13 +1218,21 @@ function demoData(){
     {key:"bonus|100|2",type:"bonus_bet",match_id:100,bet_type:"Goal in first 15 min",bet_value:"Yes",points:0,resolved:true},
     {key:"bonus|101|1",type:"bonus_bet",match_id:101,bet_type:"Red card in match",bet_value:"No"},
   ];
+  var scorers=[
+    {player_id:9001,name:"R. Jiménez",team_id:1,team_code:"MEX",group:"A",goals:3,assists:1},
+    {player_id:9002,name:"L. Modrić",team_id:2,team_code:"CRO",group:"A",goals:2,assists:2},
+    {player_id:9003,name:"A. Morata",team_id:5,team_code:"ESP",group:"B",goals:2,assists:1},
+    {player_id:9004,name:"Son Heung-min",team_id:3,team_code:"KOR",group:"A",goals:2,assists:0},
+    {player_id:9005,name:"M. Depay",team_id:6,team_code:"NED",group:"B",goals:1,assists:3},
+    {player_id:9006,name:"C. Pulisic",team_id:8,team_code:"USA",group:"B",goals:1,assists:0},
+  ];
   return {
     generated_at:new Date().toISOString(),
     players:[
       {name:"Andreas",color:"#219ebc",total_score:33,tokens:{Double:2,Triple:2,AllIn:0},mulligans:1,locked:true,locked_at:"2026-06-09T10:00:00Z"},
       {name:"Cal",color:"#fb8500",total_score:75,tokens:{Double:2,Triple:0,AllIn:1},mulligans:1,locked:true,locked_at:"2026-06-10T08:00:00Z"},
     ],
-    teams:teams, matches:matches, standings:standings, sideGames:sideGames,
+    teams:teams, matches:matches, standings:standings, sideGames:sideGames, scorers:scorers,
     picks:{Andreas:picksA, Cal:picksC},
   };
 }

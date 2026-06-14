@@ -143,6 +143,25 @@ def goal_tallies(events, fixture_ids=None):
     return goals, assists, names
 
 
+def footballer_stat_updates(goals, assists, foot_rec):
+    """Event-derived tallies -> Airtable PATCH records for the Footballers whose stored
+    goals/assists changed. foot_rec: player_id -> {"id", "goals", "assists"} from the
+    current rows. Scorers absent from foot_rec (squad-import gaps) are skipped — their
+    names still resolve via the event feed for the side games. Same counting as the Top
+    Scorer / Golden Boot games (own goals & missed pens already excluded upstream)."""
+    updates = []
+    for pid in set(goals) | set(assists):
+        rec = foot_rec.get(pid)
+        if rec is None:
+            continue
+        g, a = goals.get(pid, 0), assists.get(pid, 0)
+        if g == (rec.get("goals") or 0) and a == (rec.get("assists") or 0):
+            continue
+        updates.append({"id": rec["id"],
+                        "fields": {"goals_in_tournament": g, "assists_in_tournament": a}})
+    return updates
+
+
 def top_by_goals(goals, assists, fifa_tiebreak):
     """-> list of winning player ids. fifa_tiebreak: goals, then assists, then joint;
     otherwise plain joint on goals."""
@@ -345,14 +364,30 @@ def main():
             "events_json": f.get("events_json"),
         })
 
-    canonical_names = {}
-    for r in at_list(base, "Footballers", pat, fields=["player_id", "name"]):
+    canonical_names, foot_rec = {}, {}
+    for r in at_list(base, "Footballers", pat,
+                     fields=["player_id", "name", "goals_in_tournament", "assists_in_tournament"]):
         f = r.get("fields", {})
-        if f.get("player_id") is not None and f.get("name"):
-            canonical_names[f["player_id"]] = f["name"]
+        pid = f.get("player_id")
+        if pid is None:
+            continue
+        if f.get("name"):
+            canonical_names[pid] = f["name"]
+        foot_rec[pid] = {"id": r["id"], "goals": f.get("goals_in_tournament") or 0,
+                         "assists": f.get("assists_in_tournament") or 0}
 
     events = parse_events(match_rows)
     proposals = compute_resolutions(match_rows, events, team_group, canonical_names, team_names)
+
+    # Event-derived player tallies → Footballers (feeds the Top Scorers board on the
+    # live page). Same counting as the side games; recomputed from all stored events
+    # each run, so the board updates live and only changed rows are written.
+    g_all, a_all, _ = goal_tallies(events)
+    foot_updates = footballer_stat_updates(g_all, a_all, foot_rec)
+    if foot_updates:
+        at_update(base, "Footballers", pat, foot_updates, dry=args.dry_run)
+    if foot_updates or args.verbose:
+        print(f"· footballer stats: {len(foot_updates)} updated{' (dry)' if args.dry_run else ''}")
 
     sgs = at_list(base, "SideGames", pat, fields=["name", "resolved_value"])
     now = dt.datetime.utcnow().replace(microsecond=0).isoformat() + "Z"

@@ -45,5 +45,22 @@ check("--date for today polls only today", po.poll_dates(TODAY, target_date=TODA
 check("crosses month start correctly",
       po.poll_dates(dt.date(2026, 7, 1)) == [dt.date(2026, 6, 30), dt.date(2026, 7, 1)])
 
+# ---- should_fetch_events: capture final-minutes goals on Live→Finished -------
+sfe = po.should_fetch_events
+check("live match always refetched", sfe("2H", "Live", True) is True)
+check("live match, nothing stored yet", sfe("1H", None, False) is True)
+check("half-time counts as live", sfe("HT", "Live", True) is True)
+# THE fix: a match that was Live last poll and is now Finished must be fetched
+# once more, even though live polls already stored (partial) events — otherwise a
+# goal after the last Live snapshot is lost.
+check("Live→Finished transition refetched (the bug)", sfe("FT", "Live", True) is True)
+check("finished first sighting, no events stored", sfe("FT", "Live", False) is True)
+check("finished & already settled → stop", sfe("FT", "Finished", True) is False)
+check("finished but somehow no events → fetch", sfe("FT", "Finished", False) is True)
+check("AET transition refetched", sfe("AET", "Live", True) is True)
+check("PEN already settled → stop", sfe("PEN", "Finished", True) is False)
+check("scheduled never fetched", sfe("NS", None, False) is False)
+check("postponed never fetched", sfe("PST", None, False) is False)
+
 print(f"\n{PASS} passed, {FAIL} failed")
 sys.exit(1 if FAIL else 0)

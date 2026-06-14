@@ -541,6 +541,26 @@ async function listPublicMatches(env) {
   }
 }
 
+// Top-scorers board: Footballers with at least one event-derived goal (filled by
+// resolve_sidegames from match events). Filtered server-side so we fetch only the
+// handful of scorers, not all ~1,250 squad players. Caller tolerates a missing field.
+async function listScorers(env) {
+  const fields = ["player_id", "name", "goals_in_tournament", "assists_in_tournament", "team"];
+  const out = [];
+  let offset = null;
+  do {
+    const qs = new URLSearchParams();
+    qs.set("pageSize", "100");
+    qs.set("filterByFormula", "{goals_in_tournament} > 0");
+    for (const f of fields) qs.append("fields[]", f);
+    if (offset) qs.set("offset", offset);
+    const res = await atReq(env, "GET", `${env.AIRTABLE_BASE_ID}/Footballers?${qs}`);
+    out.push(...(res.records || []));
+    offset = res.offset;
+  } while (offset);
+  return out;
+}
+
 async function publicView(env) {
   const [playerRecs, teamRecs, matchRecs, sideRecs] = await Promise.all([
     atList(env, "PoolPlayers", ["name", "display_color", "total_score",
@@ -567,6 +587,21 @@ async function publicView(env) {
       fifa_ranking: f.fifa_ranking, kit: f.kit_color_primary, flag: f.flag_emoji });
   }
   teams.sort((a, b) => (a.group || "Z").localeCompare(b.group || "Z") || (a.name || "").localeCompare(b.name || ""));
+
+  // Top scorers — event-derived goals/assists, sorted goals → assists → name.
+  // Optional: any error (e.g. the stat field not yet added) leaves the board empty
+  // rather than breaking the whole public feed.
+  let scorers = [];
+  try {
+    for (const r of await listScorers(env)) {
+      const f = r.fields || {};
+      const ti = teamByRec[(f.team || [])[0]] || {};
+      scorers.push({ player_id: f.player_id, name: f.name,
+        team_id: ti.team_id ?? null, team_code: ti.code ?? null, group: ti.group ?? null,
+        goals: f.goals_in_tournament || 0, assists: f.assists_in_tournament || 0 });
+    }
+    scorers.sort((a, b) => b.goals - a.goals || b.assists - a.assists || (a.name || "").localeCompare(b.name || ""));
+  } catch (e) { scorers = []; }
 
   const nowIso = new Date().toISOString();
   const matchByRec = {};
@@ -685,7 +720,7 @@ async function publicView(env) {
     };
   });
 
-  return { generated_at: new Date().toISOString(), players, teams, matches, standings, sideGames, picks };
+  return { generated_at: new Date().toISOString(), players, teams, matches, standings, sideGames, scorers, picks };
 }
 
 // ---- router ----------------------------------------------------------------

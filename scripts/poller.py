@@ -38,6 +38,21 @@ def status_of(short):
     if short in PEND_CODES: return "Scheduled"
     return "Postponed"
 
+def should_fetch_events(short, prev_status, has_events):
+    """Whether to (re)fetch a fixture's events this poll.
+
+    Always while Live (keeps the feed current). For a finished match, fetch when
+    we have nothing stored yet, OR when the prior poll still had it Live — that
+    Live→Finished transition is the one poll that captures goals scored in the
+    final minutes after the last Live snapshot (cadence is 15 min, so a late goal
+    would otherwise never be backfilled and would undercount Top Scorer / Golden
+    Boot). Once stored against a Finished status, we stop (no wasted calls)."""
+    if short in LIVE_CODES:
+        return True
+    if short in DONE_CODES:
+        return (not has_events) or (prev_status != "Finished")
+    return False
+
 # ---- credentials (env first for CI, then .env.local) -----------------------
 def load_keys():
     keys = {k: os.environ.get(k) for k in ("API_FOOTBALL_KEY", "AIRTABLE_PAT", "AIRTABLE_BASE_ID")}
@@ -283,6 +298,18 @@ def run_scoreboard(keys, target_date, dry, force):
             by_fid[fx["fixture"]["id"]] = fx
     fixtures = list(by_fid.values())
 
+    # Prior state per fixture — read BEFORE the upsert flips statuses to "Finished",
+    # so should_fetch_events() can see the Live→Finished transition and grab the
+    # final-minutes events. (status, whether events_json is already stored.)
+    prev_status, have_events = {}, set()
+    if not dry:
+        for rec in at_list(base, "Matches", pat, fields=["fixture_id", "status", "events_json"]):
+            fl = rec.get("fields", {})
+            fid = fl.get("fixture_id")
+            prev_status[fid] = fl.get("status")
+            if fl.get("events_json"):
+                have_events.add(fid)
+
     records = [to_match_fields(fx, team_map, now_iso) for fx in fixtures]
     touched = at_upsert(base, "Matches", pat, records, ["fixture_id"], dry=dry) if records else 0
     print(f"· upserted {touched} Matches{' (dry)' if dry else ''}")
@@ -305,21 +332,11 @@ def run_scoreboard(keys, target_date, dry, force):
             else:
                 errors.append(str(e))
 
-    # which fixtures already have events stored, so we don't refetch finished ones
-    have_events = set()
-    if not dry:
-        for rec in at_list(base, "Matches", pat, fields=["fixture_id", "events_json"]):
-            fl = rec.get("fields", {})
-            if fl.get("events_json"):
-                have_events.add(fl.get("fixture_id"))
-
     ev_records = []
     for fx in fixtures:
         fid = fx["fixture"]["id"]
         short = (fx["fixture"].get("status") or {}).get("short", "NS")
-        live = short in LIVE_CODES
-        finished_new = short in DONE_CODES and fid not in have_events
-        if live or finished_new:
+        if should_fetch_events(short, prev_status.get(fid), fid in have_events):
             try:
                 ev_body, remaining = api_get("fixtures/events", key, fixture=fid); calls += 1
                 ev_records.append({"fixture_id": fid, "events_json": json.dumps(ev_body.get("response", []))})
