@@ -83,6 +83,11 @@
   .banner.locked{display:block;background:var(--gold-soft);color:var(--gold);border:1px solid rgba(232,185,72,.4)}
   .banner.err{background:rgba(255,90,90,.12);color:var(--bad);border:1px solid rgba(255,90,90,.4)}
   .hint{font-size:12px;color:var(--text-mute);margin-top:6px}
+  .bsave{font-size:11px;letter-spacing:.04em;white-space:nowrap;opacity:0;transition:opacity .15s;font-family:'Antonio',sans-serif;text-transform:uppercase}
+  .bsave.saving{opacity:1;color:var(--text-mute)}
+  .bsave.saved{opacity:1;color:var(--good)}
+  .bsave.retry{opacity:1;color:var(--gold)}
+  .bsave.error{opacity:1;color:var(--bad)}
   .loading{padding:60px 0;text-align:center;color:var(--text-dim);font-family:'Antonio',sans-serif;letter-spacing:.1em;text-transform:uppercase}
 
   /* propagated bracket: group-order cards */
@@ -422,9 +427,10 @@ function bonusSlotRow(m, slot){
     BONUS_TYPES.map(([val,txt])=>`<option value="${val}" ${v.bet_type===val?'selected':''}>${txt}</option>`).join('')+`</select>`;
   const valSel=`<select data-key="${key}" data-role="bet_value">${betValueOptions(v.bet_type, v.bet_value)}</select>`;
   const tokened=v.token?' tokened':'';
+  const saveTag=`<span class="bsave" id="bsave-${key}"></span>`;
   return `<div class="row mrow${tokened}" id="row-${key}">
     <span class="lab">${lab}</span>
-    <div class="mctl">${typeSel}${valSel}</div>
+    <div class="mctl">${typeSel}${valSel}${saveTag}</div>
     ${tokenSelect(key)}
     ${noteInput(key)}
   </div>`;
@@ -630,7 +636,7 @@ function render(){
   }
   bn += `<div class="lockbar" style="margin-top:24px">
     <button class="btn save bonusSave" id="bonusSaveBtn">Save bonus bets</button>
-    <div class="hint">Saving replaces all your bonus bets on matches that haven't kicked off. Kicked-off matches can't be changed.</div>
+    <div class="hint">Bonus bets save automatically as you change them — this button is just a manual backup. Each save replaces all your bonus bets on matches that haven't kicked off; kicked-off matches can't be changed.</div>
   </div>`;
 
   // --- Side bets panel ---
@@ -802,6 +808,10 @@ function onChange(e){
     document.getElementById("row-"+key).classList.toggle("tokened", !!VALUES[key].token);
     updateReserves();
   }
+  // Autosave editable bonus-bet rows (type/value/token/note) — same lock rule as the guard above
+  if(key.startsWith("bonus|") && META[key] && META[key].type==="bonus_bet" && !META[key].started){
+    markBonusDirty(key); scheduleBonusAutosave();
+  }
   updateSummary();
 }
 function flash(msg){ const s=$("#status"); s.textContent="⚠ "+msg; s.style.color="var(--bad)";
@@ -844,18 +854,73 @@ function collectBonusPicks(){
   }).filter(Boolean);
 }
 
-async function saveBonusBets(){
+// Bonus bets autosave — any editable bonus-row change schedules a debounced
+// save (~700ms after you stop), so picking type-then-value is one POST not two.
+// The manual "Save bonus bets" button stays as a backup and calls the same path.
+// A failed save auto-retries with linear backoff (idempotent: /api/savebonus
+// upserts by stable per-slot label, so resending can't duplicate a record).
+// Only transient failures retry — 4xx validation errors are surfaced, not looped.
+let bonusAutosaveTimer=null, bonusSaveInFlight=false, bonusSaveQueued=false;
+let bonusRetryTimer=null, bonusRetryCount=0;
+const BONUS_RETRY_MAX=4, BONUS_RETRY_MS=2500;
+// Per-row inline indicator. bonusDirty = rows edited since their last confirmed
+// save; bonusSaveState mirrors each row's badge so the auto-clear only fires if
+// the row is still showing "saved" (not re-edited).
+const bonusDirty=new Set(), bonusSaveState={};
+function setRowSave(key,state){
+  bonusSaveState[key]=state||undefined;
+  const el=document.getElementById("bsave-"+key); if(!el) return;
+  const map={saving:["Saving…","bsave saving"],saved:["Saved ✓","bsave saved"],
+             retry:["Retrying…","bsave retry"],error:["Not saved","bsave error"]};
+  const [txt,cls]=map[state]||["","bsave"];
+  el.textContent=txt; el.className=cls;
+}
+function clearRowSaveLater(keys){ setTimeout(()=>keys.forEach(k=>{ if(bonusSaveState[k]==="saved") setRowSave(k,""); }),2000); }
+function markBonusDirty(key){ bonusDirty.add(key); setRowSave(key,"saving"); }
+function scheduleBonusAutosave(){
+  clearTimeout(bonusAutosaveTimer);
+  clearTimeout(bonusRetryTimer);   // a fresh user edit supersedes any pending retry
+  bonusAutosaveTimer=setTimeout(()=>{ saveBonusBets({auto:true}); }, 700);
+}
+async function saveBonusBets(opts){
+  opts=opts||{};
+  // collapse a save that lands while another is in flight
+  if(bonusSaveInFlight){ if(opts.auto) bonusSaveQueued=true; return; }
+  bonusSaveInFlight=true;
+  const savingKeys=[...bonusDirty];        // exactly the rows this POST's payload carries
+  savingKeys.forEach(k=>setRowSave(k,"saving"));
   const btns=[...document.querySelectorAll("button.bonusSave")], s=$("#status");
-  btns.forEach(b=>b.disabled=true);
+  if(!opts.auto) btns.forEach(b=>b.disabled=true);
   s.style.color=""; s.textContent="Saving bonus bets…";
   try{
     const picks=collectBonusPicks();
     const res=await fetch(api("/api/savebonus"),{method:"POST",headers:{"Content-Type":"application/json"},
       body:JSON.stringify({player:PLAYER,picks})});
-    const j=await res.json(); if(!res.ok) throw new Error(j.error||"save failed");
+    let j={}; try{ j=await res.json(); }catch(_){}
+    if(!res.ok){ const e=new Error(j.error||("save failed ("+res.status+")"));
+      e.transient=(res.status>=500||res.status===429); throw e; }   // 4xx → don't retry
+    bonusRetryCount=0; clearTimeout(bonusRetryTimer);
+    savingKeys.forEach(k=>bonusDirty.delete(k));    // edits added mid-flight stay dirty for the queued save
+    savingKeys.forEach(k=>setRowSave(k,"saved")); clearRowSaveLater(savingKeys);
     s.style.color="var(--good)"; s.textContent=`Bonus bets saved ✓ ${j.saved}`;
-  }catch(err){ s.style.color="var(--bad)"; s.textContent="Bonus save failed: "+err.message; }
-  finally{ btns.forEach(b=>b.disabled=false);
+  }catch(err){
+    s.style.color="var(--bad)";
+    const retryable = err.transient!==false;   // network reject (undefined) & 5xx/429 retry; 4xx don't
+    if(retryable && bonusRetryCount<BONUS_RETRY_MAX){
+      bonusRetryCount++;
+      savingKeys.forEach(k=>setRowSave(k,"retry"));   // keys stay in bonusDirty so the retry resaves them
+      s.textContent=`Bonus save hiccup — retrying (${bonusRetryCount}/${BONUS_RETRY_MAX})…`;
+      clearTimeout(bonusRetryTimer);
+      bonusRetryTimer=setTimeout(()=>{ saveBonusBets({auto:true}); }, BONUS_RETRY_MS*bonusRetryCount);
+    } else {
+      bonusRetryCount=0;
+      savingKeys.forEach(k=>setRowSave(k,"error"));
+      s.textContent="Bonus save failed: "+err.message;
+    }
+  }
+  finally{ if(!opts.auto) btns.forEach(b=>b.disabled=false);
+    bonusSaveInFlight=false;
+    if(bonusSaveQueued){ bonusSaveQueued=false; scheduleBonusAutosave(); }   // flush the edit that arrived mid-save
     setTimeout(()=>{ if($("#status").textContent.startsWith("Bonus bets saved")) $("#status").textContent=""; },3000); }
 }
 
@@ -968,7 +1033,10 @@ window.__T = { ROUNDS, ALL_SLOT_KEYS, GROUPS, slotKeyOf, buildR32, chainIdx, pru
   groupPointsRange, groupConsistencyWarning,
   set(o){ if(o.DATA!==undefined)DATA=o.DATA; if(o.VALUES!==undefined)VALUES=o.VALUES;
           if(o.BR!==undefined)BR=o.BR; if(o.META!==undefined)META=o.META; if(o.LOCKED!==undefined)LOCKED=o.LOCKED; },
-  get(){ return {DATA,VALUES,BR,META,LOCKED}; } };
+  get(){ return {DATA,VALUES,BR,META,LOCKED}; },
+  bonusReset(){ bonusDirty.clear(); for(const k in bonusSaveState) delete bonusSaveState[k];
+    bonusSaveInFlight=false; bonusSaveQueued=false; bonusRetryCount=0;
+    clearTimeout(bonusRetryTimer); clearTimeout(bonusAutosaveTimer); } };
 
 const LOCAL = location.hostname==="127.0.0.1" || location.hostname==="localhost";
 if(TOKEN){ $("#playerSeg").style.display="none"; loadPlayer(); }
