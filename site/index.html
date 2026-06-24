@@ -690,9 +690,11 @@ function setTab(name){
 }
 
 // ---- Mulligan (post-lock, June 26–28): re-pick one bracket slot OR the Dark Horse ----
-const MULL_WINDOW = ["2026-06-26","2026-06-28"];   // mirrors pickentry_server.MULLIGAN_WINDOW
-function mullWindowState(){ const d=new Date().toISOString().slice(0,10);
-  return d<MULL_WINDOW[0]?"before":(d>MULL_WINDOW[1]?"after":"open"); }
+// The window comes from the server (bootstrap → DATA.mulliganWindow), so it's edited in ONE
+// place: pickentry_server.MULLIGAN_WINDOW. The literal here is only a fallback for a stale bootstrap.
+function mullWindow(){ return (DATA && DATA.mulliganWindow) || ["2026-06-26","2026-06-28"]; }
+function mullWindowState(){ const w=mullWindow(), d=new Date().toISOString().slice(0,10);
+  return d<w[0]?"before":(d>w[1]?"after":"open"); }
 function slotLabel(k){
   if(k==="Champion") return "Champion";
   const m=k.match(/^(R16|QF|SF|F)-(\d+)$/); if(!m) return k;
@@ -714,7 +716,7 @@ function mulliganUsedRecord(){
 }
 function renderMulliganContent(){
   const left=(DATA&&DATA.mulligansRemaining!=null)?DATA.mulligansRemaining:1;
-  const a=MULL_WINDOW[0].slice(-2), b=MULL_WINDOW[1].slice(-2), win=mullWindowState();
+  const w=mullWindow(), a=w[0].slice(-2), b=w[1].slice(-2), win=mullWindowState();
   let h=`<h2>Mulligan <span class="pts">· one per player</span></h2>
     <div class="sub">After the group stage and before the Round of 32, re-pick <b>one</b> bracket-ladder slot
     <b>or</b> your Dark Horse. The original and the replacement then each score at <b>50%</b>. Your opponent sees the
@@ -1128,7 +1130,7 @@ window.__T = { ROUNDS, ALL_SLOT_KEYS, GROUPS, slotKeyOf, buildR32, chainIdx, pru
   structureComplete, syncStructValues, propagateBR, loadStructFromValues, bracketProgress,
   renderKOContent, collectPicks, onBracketAct, countTokens, onChange, collectBonusPicks,
   groupPointsRange, groupConsistencyWarning,
-  renderMulliganContent, mulliganEligible, slotLabel, mullWindowState, mulliganUsedRecord,
+  renderMulliganContent, mulliganEligible, slotLabel, mullWindow, mullWindowState, mulliganUsedRecord,
   set(o){ if(o.DATA!==undefined)DATA=o.DATA; if(o.VALUES!==undefined)VALUES=o.VALUES;
           if(o.BR!==undefined)BR=o.BR; if(o.META!==undefined)META=o.META; if(o.LOCKED!==undefined)LOCKED=o.LOCKED; },
   get(){ return {DATA,VALUES,BR,META,LOCKED}; },

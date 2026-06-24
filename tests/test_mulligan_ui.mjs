@@ -31,6 +31,16 @@ check("slotLabel maps Champion + ladder keys",
 check("window state is a valid value",
       ["before","open","after"].includes(T.mullWindowState()));
 
+// ---- window comes from the server (bootstrap), not a UI constant ----
+T.set({ DATA: { ...DATA, mulliganWindow: ["2020-01-01","2020-01-02"] }, VALUES, LOCKED: true });
+check("server window honored — past window reads 'after'", T.mullWindowState() === "after");
+check("mullWindow() returns the server value", T.mullWindow()[0] === "2020-01-01");
+T.set({ DATA: { ...DATA, mulliganWindow: ["2099-01-01","2099-01-02"] }, VALUES, LOCKED: true });
+check("server window honored — future window reads 'before'", T.mullWindowState() === "before");
+check("falls back when bootstrap omits the window",
+      (T.set({ DATA: { ...DATA }, VALUES, LOCKED: true }), T.mullWindow()[0] === "2026-06-26"));
+T.set({ DATA, VALUES, LOCKED: true });   // restore for the used-state checks below
+
 // ---- used state ----
 T.set({ DATA: { ...DATA, mulligansRemaining: 0 },
         VALUES: { ...VALUES, "darkhorse|mull": { team_id: "116" } } });

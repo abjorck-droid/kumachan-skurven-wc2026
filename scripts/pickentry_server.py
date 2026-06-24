@@ -29,7 +29,7 @@ BONUS_TYPES = ["BTTS", "Over 2.5 goals", "Penalty in match", "Red card in match"
                "Both teams score 2+", "Goal in first 15 min"]
 # Mulligan (spec 03 §The Mulligan, v1.1): one per player, used after the group stage and
 # before R32. Window dates are inclusive UTC and TENTATIVE — refine to FIFA's R32 schedule.
-MULLIGAN_WINDOW = ("2026-06-26", "2026-06-28")
+MULLIGAN_WINDOW = ("2026-06-24", "2026-06-28")
 DARK_HORSE_MAX_RANK = 16              # FIFA rank > this ⇒ Dark-Horse-eligible (11 June 2026 edition)
 MULLIGAN_TYPES = {"bracket_slot", "dark_horse"}
 
@@ -224,6 +224,7 @@ def bootstrap(player):
             "footballers": footballers, "matches": matches,
             "tokensStart": START_TOKENS, "locked": locked, "existing": existing,
             "mulligansRemaining": pf.get("mulligans_remaining", 1),
+            "mulliganWindow": list(MULLIGAN_WINDOW),   # single source of truth; the UI reads this
             "tokensRemaining": {"Double": pf.get("tokens_remaining_double", 4),
                                 "Triple": pf.get("tokens_remaining_triple", 2),
                                 "AllIn": pf.get("tokens_remaining_allin", 1)}}
