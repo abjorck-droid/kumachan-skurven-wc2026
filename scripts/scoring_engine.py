@@ -163,6 +163,28 @@ def apply_token(base_pts, token):
         return base_pts * TOKEN_MULT[token]
     return base_pts
 
+def mulligan_affected(mulls):
+    """Set of Prediction record ids touched by any mulligan — both the original (now
+    invalidated) and the replacement pick. Type-agnostic by construction: it reads the
+    link fields without inspecting prediction_type, so it covers bracket_slot picks (v1.0)
+    and the Dark Horse (v1.1) identically. `mulls` are Airtable records ({"id","fields"})."""
+    affected = set()
+    for m in mulls:
+        f = m["fields"]
+        for fld in ("original_prediction", "new_prediction"):
+            for rid in (f.get(fld) or []):
+                affected.add(rid)
+    return affected
+
+def finalize_points(base_pts, token, mulliganed):
+    """A prediction's final base points: confidence token first, THEN the mulligan 50%
+    factor if this pick was mulliganed (spec 'token first, then halve' ordering). Applies
+    to any mulligan-eligible pick — bracket_slot (v1.0) and dark_horse (v1.1)."""
+    pts = apply_token(base_pts, token)
+    if mulliganed:
+        pts = int(round(pts * MULLIGAN_FACTOR))
+    return pts
+
 def first_claim(seen, key):
     """Pool rule (erratum 2026-06-06): within a bracket round, each team counts at most
     once per player. First claim (rows processed in label order, so deterministic) scores;
@@ -302,11 +324,7 @@ def main():
     preds = at_list(base, "Predictions", pat)
     preds.sort(key=lambda r: r.get("fields", {}).get("label", ""))   # deterministic dedupe order
     mulls = at_list(base, "Mulligans", pat, fields=["original_prediction", "new_prediction"])
-    mull_affected = set()
-    for m in mulls:
-        for fld in ("original_prediction", "new_prediction"):
-            for rid in (m["fields"].get(fld) or []):
-                mull_affected.add(rid)
+    mull_affected = mulligan_affected(mulls)
 
     # --- match index + teams-reached map ---
     match_by_rec = {}
@@ -474,9 +492,7 @@ def main():
     totals = {}
     for r in preds:
         rec = r["id"]
-        pts = apply_token(base_pts.get(rec, 0), token_of.get(rec))
-        if rec in mull_affected:
-            pts = int(round(pts * MULLIGAN_FACTOR))
+        pts = finalize_points(base_pts.get(rec, 0), token_of.get(rec), rec in mull_affected)
         br = beat.get(rec, 0)
         player = pred_player.get(rec)
         totals[player] = totals.get(player, 0) + pts + br

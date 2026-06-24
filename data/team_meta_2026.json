@@ -1,6 +1,6 @@
 {
-  "_readme": "Per-team metadata for the 48 WC2026 sides, keyed by Teams.code. kit = primary home-kit hex for UI accents (whites rendered as light grays so they read on the dark board). fifa_ranking = FIFA/Coca-Cola Men's World Ranking, 10 June 2026 pre-tournament edition - the edition that governs Dark Horse eligibility at lock (rank 17+ eligible); next FIFA update is 20 July 2026, after the tournament. vs April edition only the 16/17 boundary flipped: Uruguay up to 16 (DH ILLEGAL), USA down to 17 (DH LEGAL); other sub-boundary moves do not affect eligibility. After editing this file re-run scripts/backfill_team_meta.py to push rankings into Airtable - the pick-entry Dark Horse filter reads Teams.fifa_ranking via bootstrap.",
-  "ranking_edition": "2026-06-10",
+  "_readme": "Per-team metadata for the 48 WC2026 sides, keyed by Teams.code. kit = primary home-kit hex for UI accents (whites rendered as light grays so they read on the dark board). fifa_ranking = FIFA/Coca-Cola Men's World Ranking, 11 June 2026 pre-tournament edition - the edition that governs Dark Horse eligibility at lock (rank 17+ eligible) and the one the players based their initial Dark Horse picks on; next FIFA update is 20 July 2026, after the tournament. vs April edition only the 16/17 boundary flipped: Uruguay up to 16 (DH ILLEGAL), USA down to 17 (DH LEGAL); other sub-boundary moves do not affect eligibility. After editing this file re-run scripts/backfill_team_meta.py to push rankings into Airtable - the pick-entry Dark Horse filter reads Teams.fifa_ranking via bootstrap.",
+  "ranking_edition": "2026-06-11",
   "teams": {
     "FRA": {
       "flag": "🇫🇷",

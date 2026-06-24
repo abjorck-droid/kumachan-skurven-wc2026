@@ -27,6 +27,11 @@ START_TOKENS = {"Double": 4, "Triple": 2, "AllIn": 1}
 # Per-match bonus-bet menu (mirrors the Pages Function; all binary Yes/No).
 BONUS_TYPES = ["BTTS", "Over 2.5 goals", "Penalty in match", "Red card in match",
                "Both teams score 2+", "Goal in first 15 min"]
+# Mulligan (spec 03 §The Mulligan, v1.1): one per player, used after the group stage and
+# before R32. Window dates are inclusive UTC and TENTATIVE — refine to FIFA's R32 schedule.
+MULLIGAN_WINDOW = ("2026-06-26", "2026-06-28")
+DARK_HORSE_MAX_RANK = 16              # FIFA rank > this ⇒ Dark-Horse-eligible (11 June 2026 edition)
+MULLIGAN_TYPES = {"bracket_slot", "dark_horse"}
 
 def load_keys():
     keys = {k: os.environ.get(k) for k in ("AIRTABLE_PAT", "AIRTABLE_BASE_ID")}
@@ -218,6 +223,7 @@ def bootstrap(player):
     return {"player": player, "players": ["Andreas", "Cal"], "teams": teams, "sideGames": side,
             "footballers": footballers, "matches": matches,
             "tokensStart": START_TOKENS, "locked": locked, "existing": existing,
+            "mulligansRemaining": pf.get("mulligans_remaining", 1),
             "tokensRemaining": {"Double": pf.get("tokens_remaining_double", 4),
                                 "Triple": pf.get("tokens_remaining_triple", 2),
                                 "AllIn": pf.get("tokens_remaining_allin", 1)}}
@@ -389,6 +395,52 @@ def bracket_guard(picks, teams_by_code):
                 raise RuntimeError(f"two {name[t]} picks sit on the same bracket path — only one side of a tie can advance")
             seen.add(idx)
 
+def mulligan_guard(target_key, replacement, picks, teams_by_code, teams_by_id,
+                   mulligans_remaining, tokens_remaining=None, now=None):
+    """Validate one mulligan before any write — raises RuntimeError(fragment), mirroring
+    bracket_guard's reject-before-write discipline. Pure: every input is passed in.
+
+      target_key   key of the pick being re-picked: a bracket slot ('Champion', 'R16-3')
+                   or the Dark Horse ('darkhorse').
+      replacement  client dict for the new pick: {team_id, token?}. A mulligan can't change a
+                   slot's type, so type/bracket_slot are inherited from the original.
+      picks        the player's CURRENT pick set, for the swap + bracket re-validation.
+      teams_by_id  {int team_id -> {code, group, fifa_ranking}} (teams_by_code likewise).
+
+    Returns the original pick dict on success (handy for the caller).
+    """
+    today = (now or dt.datetime.utcnow()).date().isoformat()
+    if not (MULLIGAN_WINDOW[0] <= today <= MULLIGAN_WINDOW[1]):
+        raise RuntimeError(f"mulligan window is not open (June {MULLIGAN_WINDOW[0][-2:]}–{MULLIGAN_WINDOW[1][-2:]})")
+    if not (mulligans_remaining and mulligans_remaining > 0):
+        raise RuntimeError("mulligan already used")
+    orig = next((p for p in (picks or []) if p.get("key") == target_key), None)
+    if orig is None:
+        raise RuntimeError(f"target pick '{target_key}' not found among your picks")
+    if orig.get("type") not in MULLIGAN_TYPES:
+        raise RuntimeError(f"'{target_key}' is not a mulligan-eligible pick (only bracket slots or the Dark Horse)")
+    new_tid = replacement.get("team_id")
+    if new_tid in (None, ""):
+        raise RuntimeError("replacement needs a team")
+    new_tid = int(new_tid)
+    orig_tid = orig.get("team_id")
+    if orig_tid not in (None, "") and int(orig_tid) == new_tid:
+        raise RuntimeError("replacement is identical to the original pick")
+    if orig["type"] == "dark_horse":
+        team = teams_by_id.get(new_tid)
+        if not team:
+            raise RuntimeError("replacement team not found")
+        rank = team.get("fifa_ranking")
+        if rank is None or rank <= DARK_HORSE_MAX_RANK:
+            raise RuntimeError(f"{team.get('code') or new_tid} is not Dark-Horse-eligible (FIFA rank ≤ {DARK_HORSE_MAX_RANK})")
+    if orig["type"] == "bracket_slot":
+        swapped = [({**p, "team_id": new_tid} if p.get("key") == target_key else p) for p in picks]
+        bracket_guard(swapped, teams_by_code)   # nesting / dedupe / same-path — reuses the v1.0 rules
+    tok = replacement.get("token")
+    if tok and (tokens_remaining or {}).get(tok, 0) <= 0:
+        raise RuntimeError(f"no {tok} tokens remaining for the replacement")
+    return orig
+
 def save(player, picks):
     prow = get_player(player)
     if not prow:
@@ -522,6 +574,116 @@ def save_bonus(player, picks):
         "tokens_remaining_allin": START_TOKENS["AllIn"] - used["AllIn"]}}]})
     return {"saved": saved, "deleted": deleted, "tokensUsed": used}
 
+def save_mulligan(player, target_key, replacement, note="", now=None, dry_run=False):
+    """Spend the player's one mulligan to re-pick `target_key` (a bracket slot or the Dark
+    Horse) with `replacement` ({team_id, token?}). Validates first (mulligan_guard, which
+    rejects before any write), then:
+      1. upserts the replacement as a SIBLING Prediction — label '<player>|<key>|mull', so
+         the original row survives and the scoring engine halves BOTH (mull_affected);
+      2. logs a Mulligans row linking original→replacement (idempotent: skipped if one
+         already references the original);
+      3. spends the mulligan (mulligans_remaining→0; reserves a token if one was attached).
+    Writes nothing if validation fails. With dry_run=True, validates and returns the exact
+    planned writes (`wouldWrite`) WITHOUT committing — for a safe preview against live data."""
+    prow = get_player(player)
+    if not prow:
+        raise RuntimeError(f"player '{player}' not found in PoolPlayers")
+    player_rec = prow["id"]
+    pf = prow.get("fields", {})
+    mull_left = pf.get("mulligans_remaining", 1)
+    tokens_remaining = {"Double": pf.get("tokens_remaining_double", 4),
+                        "Triple": pf.get("tokens_remaining_triple", 2),
+                        "AllIn":  pf.get("tokens_remaining_allin", 1)}
+
+    team_map, teams_by_code, teams_by_id, rec2tid = {}, {}, {}, {}
+    for r in at_list("Teams", fields=["team_id", "code", "group", "fifa_ranking"]):
+        f = r["fields"]
+        if f.get("team_id") is None:
+            continue
+        tid = int(f["team_id"])
+        team_map[tid] = r["id"]; rec2tid[r["id"]] = tid
+        info = {"team_id": tid, "code": f.get("code"), "group": f.get("group"),
+                "fifa_ranking": f.get("fifa_ranking")}
+        teams_by_id[tid] = info
+        if f.get("code"):
+            teams_by_code[f["code"]] = info
+
+    # reconstruct the player's CURRENT picks + remember each pick's record id
+    picks, rec_of = [], {}
+    for r in at_list("Predictions"):
+        f = r.get("fields", {})
+        lbl = f.get("label", "")
+        if not lbl.startswith(player + "|"):
+            continue
+        key = lbl.split("|", 1)[1]
+        ptype = f.get("prediction_type")
+        link = f.get("predicted_team") or []
+        tid = rec2tid.get(link[0]) if link else None
+        if ptype == "bracket_slot":
+            picks.append({"key": key, "type": "bracket_slot",
+                          "bracket_slot": f.get("bracket_slot") or key, "team_id": tid})
+        elif ptype == "bracket_struct":
+            picks.append({"key": key, "type": "bracket_struct",
+                          "bracket_slot": f.get("bracket_slot") or key, "player_text": f.get("predicted_text")})
+        elif ptype == "dark_horse":
+            picks.append({"key": key, "type": "dark_horse", "side_game": "Dark Horse", "team_id": tid})
+        rec_of[key] = r["id"]
+
+    orig = mulligan_guard(target_key, replacement, picks, teams_by_code, teams_by_id,
+                          mull_left, tokens_remaining, now=now)
+    orig_rec = rec_of.get(target_key)
+    if not orig_rec:
+        raise RuntimeError(f"original prediction row for '{target_key}' not found")
+
+    stamp = (now or dt.datetime.utcnow()).replace(microsecond=0).isoformat() + "Z"
+    new_label = f"{player}|{target_key}|mull"
+    # build the replacement as a sibling row (distinct label, same scoring identity)
+    sg_map = {r["fields"].get("name"): r["id"] for r in at_list("SideGames", fields=["name"])}
+    tok = replacement.get("token")
+    new_pick = {"key": f"{target_key}|mull", "type": orig["type"], "team_id": replacement.get("team_id")}
+    if orig["type"] == "bracket_slot":
+        new_pick["bracket_slot"] = orig.get("bracket_slot") or target_key
+    if orig["type"] == "dark_horse":
+        new_pick["side_game"] = "Dark Horse"
+    if tok:
+        new_pick["token"] = tok
+    rec_fields = prediction_fields(player, new_pick, team_map, player_rec, sg_map)
+    rec_fields["locked_at"] = stamp
+
+    # spend the mulligan (+ reserve a token if the replacement took one)
+    patch = {"mulligans_remaining": 0}
+    if tok:
+        field = {"Double": "tokens_remaining_double", "Triple": "tokens_remaining_triple",
+                 "AllIn": "tokens_remaining_allin"}[tok]
+        patch[field] = max(0, tokens_remaining.get(tok, 0) - 1)
+
+    new_team = teams_by_id.get(int(replacement["team_id"]), {})
+    summary = {"mulliganed": target_key, "new_label": new_label, "replacement_type": orig["type"],
+               "replacement_team": replacement.get("team_id"), "replacement_code": new_team.get("code"),
+               "original_team": orig.get("team_id"), "token": tok}
+
+    if dry_run:   # validate + show the plan, commit nothing
+        return {**summary, "dryRun": True, "committed": False, "mulligans_remaining": mull_left,
+                "wouldWrite": {"replacement": rec_fields,
+                               "mulligan_link": {"original_prediction": [orig_rec],
+                                                 "new_prediction": "(created on commit)"},
+                               "budget_patch": patch}}
+
+    # ---- commit: replacement row, then the Mulligans log, then the budget (last, so a
+    # crash before the budget write leaves the mulligan spendable and the swap re-doable) ----
+    at_upsert("Predictions", [rec_fields], ["label"])
+    new_rec = next((r["id"] for r in at_list("Predictions", fields=["label"])
+                    if r["fields"].get("label") == new_label), None)
+    existing = at_list("Mulligans", fields=["original_prediction"])
+    already = any(orig_rec in (m.get("fields", {}).get("original_prediction") or []) for m in existing)
+    if new_rec and not already:
+        at("POST", f"{BASE}/Mulligans", {"records": [{"fields": {
+            "pool_player": [player_rec], "used_at": stamp,
+            "original_prediction": [orig_rec], "new_prediction": [new_rec],
+            "note": note}}], "typecast": True})
+    at("PATCH", f"{BASE}/PoolPlayers", {"records": [{"id": player_rec, "fields": patch}]})
+    return {**summary, "committed": True, "mulligans_remaining": 0}
+
 def lock(player):
     now = dt.datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
     ids = [r["id"] for r in at_list("Predictions", fields=["label"])
@@ -567,6 +729,10 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(200, save(body["player"], body.get("picks", [])))
             if u.path == "/api/savebonus":
                 return self._send(200, save_bonus(body["player"], body.get("picks", [])))
+            if u.path == "/api/mulligan":
+                return self._send(200, save_mulligan(body["player"], body["target"],
+                                                     body.get("replacement", {}), body.get("note", ""),
+                                                     dry_run=bool(body.get("dryRun"))))
             if u.path == "/api/lock":
                 return self._send(200, lock(body["player"]))
         except Exception as e:

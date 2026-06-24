@@ -62,6 +62,13 @@
   .tabs .tc{color:var(--gold);font-size:11px}
   .tabpanel{display:none}
   .tabpanel.active{display:block}
+  /* mulligan panel */
+  .mullbox{border:1px solid var(--border);border-radius:10px;padding:16px 18px;margin-top:14px;max-width:580px}
+  .mullrow{display:flex;align-items:center;gap:12px;margin:11px 0}
+  .mullrow label{flex:0 0 84px;color:var(--text-dim);font-size:13px}
+  .mullrow select{flex:1;padding:7px 8px}
+  .mullbtns{display:flex;gap:10px;margin-top:16px;flex-wrap:wrap}
+  .mullout{margin-top:14px;font-size:14px;line-height:1.55;min-height:1.2em}
   .row .lab{font-family:'Antonio',sans-serif;font-size:13px;letter-spacing:.05em;color:var(--text-dim);text-transform:uppercase}
   .row .note{grid-column:2 / 4;margin-top:2px}
   select,input{width:100%;background:var(--card-soft);border:1px solid var(--border-strong);border-radius:5px;color:var(--text);font-family:'Inter',sans-serif;font-size:14px;padding:8px 10px;outline:none}
@@ -143,6 +150,7 @@
   <button data-tab="side">Side bets<span class="tc" id="tc-side"></span></button>
   <button data-tab="bonus">Bonus bets<span class="tc" id="tc-bonus"></span></button>
   <button data-tab="review">Review &amp; Lock</button>
+  <button data-tab="mulligan" id="mullTab" style="display:none">Mulligan</button>
 </div></div>
 
 <div class="wrap">
@@ -320,7 +328,7 @@ const TOKEN = new URLSearchParams(location.search).get("p");
 function api(path){ return TOKEN ? path + (path.includes("?")?"&":"?") + "p=" + encodeURIComponent(TOKEN) : path; }
 
 const $ = s => document.querySelector(s);
-// dhOnly = Dark-Horse mode: hide FIFA top-16 teams (rank at lock, 10 June 2026
+// dhOnly = Dark-Horse mode: hide FIFA top-16 teams (rank at lock, 11 June 2026
 // edition, served from Teams.fifa_ranking). A currently-saved ineligible pick
 // stays visible but flagged INELIGIBLE so a stale save is never silently hidden.
 function teamOptions(sel, dhOnly){
@@ -576,7 +584,7 @@ function renderKOContent(){
     });
   }
 
-  h += `<h2>Dark Horse <span class="pts">· ladder up to 1000 pts</span></h2><div class="sub">One team, ranked outside the FIFA top 16 at lock — the dropdown already hides ineligible teams (10 June 2026 ranking). The spiciest pick in the game — an All-In here is the boldest move available. Independent of the bracket above.</div>`;
+  h += `<h2>Dark Horse <span class="pts">· ladder up to 1000 pts</span></h2><div class="sub">One team, ranked outside the FIFA top 16 at lock — the dropdown already hides ineligible teams (11 June 2026 ranking). The spiciest pick in the game — an All-In here is the boldest move available. Independent of the bracket above.</div>`;
   h += teamRow("darkhorse","Dark Horse",true);
   return h;
 }
@@ -667,7 +675,8 @@ function render(){
     `<div class="tabpanel" data-tab="ko">${ko}</div>`+
     `<div class="tabpanel" data-tab="side">${sb}</div>`+
     `<div class="tabpanel" data-tab="bonus">${bn}</div>`+
-    `<div class="tabpanel" data-tab="review">${rv}</div>`;
+    `<div class="tabpanel" data-tab="review">${rv}</div>`+
+    `<div class="tabpanel" data-tab="mulligan">${renderMulliganContent()}</div>`;
   $("#tabs").style.display="flex";
   setTab(ACTIVE_TAB);
   updateReserves(); updateSummary();
@@ -678,6 +687,88 @@ function setTab(name){
   ACTIVE_TAB = name;
   document.querySelectorAll(".tabpanel").forEach(p=>p.classList.toggle("active", p.dataset.tab===name));
   document.querySelectorAll("#tabs button").forEach(b=>b.classList.toggle("on", b.dataset.tab===name));
+}
+
+// ---- Mulligan (post-lock, June 26–28): re-pick one bracket slot OR the Dark Horse ----
+const MULL_WINDOW = ["2026-06-26","2026-06-28"];   // mirrors pickentry_server.MULLIGAN_WINDOW
+function mullWindowState(){ const d=new Date().toISOString().slice(0,10);
+  return d<MULL_WINDOW[0]?"before":(d>MULL_WINDOW[1]?"after":"open"); }
+function slotLabel(k){
+  if(k==="Champion") return "Champion";
+  const m=k.match(/^(R16|QF|SF|F)-(\d+)$/); if(!m) return k;
+  return ({R16:"Round-of-16",QF:"Quarter-final",SF:"Semi-final",F:"Finalist"}[m[1]])+" #"+m[2];
+}
+function slotLabelOrDH(k){ return k==="darkhorse"?"Dark Horse":slotLabel(k); }
+function mullTeamLabel(id){ const t=teamById(id); return t?((t.code?t.code+" · ":"")+t.name):("team "+id); }
+function mulliganEligible(){
+  const out=[], dh=VALUES["darkhorse"]||{};
+  if(dh.team_id) out.push({key:"darkhorse", isDH:true, team_id:String(dh.team_id), label:"Dark Horse"});
+  ALL_SLOT_KEYS.forEach(k=>{ const v=VALUES[k]||{}; if(v.team_id)
+    out.push({key:k, isDH:false, team_id:String(v.team_id), label:slotLabel(k)}); });
+  return out;
+}
+function mulliganUsedRecord(){
+  const k=Object.keys(VALUES).find(x=>x.endsWith("|mull") && (VALUES[x]||{}).team_id);
+  if(!k) return ""; const base=k.slice(0,-5);
+  return `${slotLabelOrDH(base)} → ${mullTeamLabel(String(VALUES[k].team_id))}`;
+}
+function renderMulliganContent(){
+  const left=(DATA&&DATA.mulligansRemaining!=null)?DATA.mulligansRemaining:1;
+  const a=MULL_WINDOW[0].slice(-2), b=MULL_WINDOW[1].slice(-2), win=mullWindowState();
+  let h=`<h2>Mulligan <span class="pts">· one per player</span></h2>
+    <div class="sub">After the group stage and before the Round of 32, re-pick <b>one</b> bracket-ladder slot
+    <b>or</b> your Dark Horse. The original and the replacement then each score at <b>50%</b>. Your opponent sees the
+    swap <b>the instant you use it</b>, and it <b>can't be undone</b>. Window: <b>June ${a}–${b}</b>.</div>`;
+  if(left<=0){ const u=mulliganUsedRecord();
+    return h+`<div class="okline">Your mulligan has been used${u?` — ${u}`:""}. Nothing more to do here.</div>`; }
+  const elig=mulliganEligible();
+  if(!elig.length) return h+`<div class="warnbox">No mulligan-eligible picks yet — lock a bracket and a Dark Horse first.</div>`;
+  if(win==="before") h+=`<div class="warnbox">⏳ The window opens <b>June ${a}</b>. You can build and <b>preview</b> your choice now, but it can't be committed until then.</div>`;
+  if(win==="after")  h+=`<div class="warnbox">⛔ The mulligan window has closed.</div>`;
+  const targOpts=`<option value="">— choose a pick to re-pick —</option>`+
+    elig.map(e=>`<option value="${e.key}" data-dh="${e.isDH?1:0}">${e.label} — now ${mullTeamLabel(e.team_id)}</option>`).join("");
+  const tokOpts=`<option value="">— no token —</option>`+Object.entries(DATA.tokensRemaining||{})
+    .filter(([k,n])=>n>0).map(([k,n])=>`<option value="${k}">${({Double:"Double ×2",Triple:"Triple ×3",AllIn:"All-In ×5"})[k]} (${n} left)</option>`).join("");
+  return h+`<div class="mullbox">
+    <div class="mullrow"><label>Re-pick</label><select id="mull-target">${targOpts}</select></div>
+    <div class="mullrow"><label>New team</label><select id="mull-replace"><option value="">— pick a target first —</option></select></div>
+    <div class="mullrow"><label>Token</label><select id="mull-token">${tokOpts}</select></div>
+    <div class="mullbtns"><button class="btn" id="mull-preview">Preview (no commit)</button>
+      <button class="btn lock" id="mull-confirm">Use my mulligan</button></div>
+    <div id="mull-out" class="mullout"></div></div>`;
+}
+function populateMullReplace(){
+  const t=$("#mull-target"), sel=$("#mull-replace"); if(!t||!sel) return;
+  if(!t.value){ sel.innerHTML=`<option value="">— pick a target first —</option>`; return; }
+  const opt=t.options[t.selectedIndex], isDH=!!(opt&&opt.dataset.dh==="1");
+  sel.innerHTML=teamOptions("", isDH);   // DH hides top-16; no preselect → forces a deliberate new choice
+}
+async function mulliganRequest(dryRun){
+  const target=($("#mull-target")||{}).value||"", team=($("#mull-replace")||{}).value||"";
+  const token=($("#mull-token")||{}).value||"", out=$("#mull-out"); if(!out) return;
+  if(!target){ out.style.color="var(--bad)"; out.textContent="Choose which pick to re-pick."; return; }
+  if(!team){ out.style.color="var(--bad)"; out.textContent="Choose a replacement team."; return; }
+  const replacement={team_id:team}; if(token) replacement.token=token;
+  out.style.color=""; out.textContent=dryRun?"Previewing…":"Using your mulligan…";
+  try{
+    const res=await fetch(api("/api/mulligan"),{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({player:PLAYER, target, replacement, dryRun})});
+    const j=await res.json(); if(!res.ok) throw new Error(j.error||"mulligan failed");
+    if(dryRun){ out.style.color="var(--gold)"; out.innerHTML=
+      `Preview only — nothing saved. This would change <b>${slotLabelOrDH(j.mulliganed)}</b> to <b>${j.replacement_code||team}</b>`+
+      (j.token?` with a <b>${j.token}</b> token`:"")+`, mark both old &amp; new at 50%, and spend your mulligan (remaining → 0). Click <b>Use my mulligan</b> to commit.`; }
+    else { out.style.color="var(--good)"; out.innerHTML=
+      `✓ Mulligan used — <b>${slotLabelOrDH(j.mulliganed)}</b> → <b>${j.replacement_code||team}</b>. Both score at 50%, and your opponent can see it now.`;
+      DATA.mulligansRemaining=0;
+      ["mull-target","mull-replace","mull-token","mull-preview","mull-confirm"].forEach(id=>{const el=$("#"+id); if(el) el.disabled=true;}); }
+  }catch(err){ out.style.color="var(--bad)"; out.textContent="✗ "+err.message; }
+}
+function confirmMulligan(){
+  const t=$("#mull-target"), r=$("#mull-replace"), out=$("#mull-out");
+  if(!t||!t.value){ if(out){out.style.color="var(--bad)";out.textContent="Choose which pick to re-pick.";} return; }
+  if(!r||!r.value){ if(out){out.style.color="var(--bad)";out.textContent="Choose a replacement team.";} return; }
+  if(!confirm(`Use your one mulligan?\n\n${t.options[t.selectedIndex].text}\n→ ${r.options[r.selectedIndex].text}\n\nBoth the old and new pick score at 50%. Your opponent sees this immediately. It cannot be undone.`)) return;
+  mulliganRequest(false);
 }
 function hasVal(v){ return !!(v && (v.team_id||v.player_id||v.player_text||v.outcome||v.bet_type||(v.score_home!=null&&v.score_home!=="")||(v.scalar!==undefined&&v.scalar!=="")||v.token||v.note)); }
 function tabOf(key){
@@ -946,9 +1037,12 @@ async function lockBracket(){
 }
 function setLockedUI(){
   $("#lockBanner").style.display="block";
-  // bonus bets keep their own per-match lock (kickoff) — that tab stays live
+  const mt=$("#mullTab"); if(mt) mt.style.display="";   // mulligan tab is post-lock only
+  // bonus bets keep their own per-match lock (kickoff), and the mulligan panel has its own
+  // window gating + server guard — both tabs stay live after the main lock
   document.querySelectorAll("select,input").forEach(el=>{
-    if(!el.closest(".seg") && !el.closest('.tabpanel[data-tab="bonus"]')) el.disabled=true; });
+    if(!el.closest(".seg") && !el.closest('.tabpanel[data-tab="bonus"]')
+       && !el.closest('.tabpanel[data-tab="mulligan"]')) el.disabled=true; });
   const lb=$("#lockBtn"); if(lb){ lb.disabled=true; lb.textContent="Locked"; lb.style.opacity=".5"; }
 }
 function showErr(m){ const b=$("#errBanner"); b.textContent="⚠ "+m; b.style.display="block"; setTimeout(()=>b.style.display="none",5000); }
@@ -979,6 +1073,7 @@ async function loadPlayer(player){
 }
 
 $("#app").addEventListener("change", onChange);
+$("#app").addEventListener("change", e=>{ if(e.target.id==="mull-target") populateMullReplace(); });
 $("#app").addEventListener("input", e=>{
   if(e.target.classList.contains("pfind")){
     const key=e.target.dataset.pkey;
@@ -1017,6 +1112,8 @@ document.addEventListener("click", e=>{
   if(e.target.id==="saveBtn") save();
   if(e.target.classList && e.target.classList.contains("bonusSave")) saveBonusBets();
   if(e.target.id==="lockBtn") lockBracket();
+  if(e.target.id==="mull-preview") mulliganRequest(true);
+  if(e.target.id==="mull-confirm") confirmMulligan();
   const ab=e.target.closest && e.target.closest("[data-act]");
   if(ab && !LOCKED) onBracketAct(ab);
   const tb=e.target.closest && e.target.closest("#tabs button");
@@ -1031,6 +1128,7 @@ window.__T = { ROUNDS, ALL_SLOT_KEYS, GROUPS, slotKeyOf, buildR32, chainIdx, pru
   structureComplete, syncStructValues, propagateBR, loadStructFromValues, bracketProgress,
   renderKOContent, collectPicks, onBracketAct, countTokens, onChange, collectBonusPicks,
   groupPointsRange, groupConsistencyWarning,
+  renderMulliganContent, mulliganEligible, slotLabel, mullWindowState, mulliganUsedRecord,
   set(o){ if(o.DATA!==undefined)DATA=o.DATA; if(o.VALUES!==undefined)VALUES=o.VALUES;
           if(o.BR!==undefined)BR=o.BR; if(o.META!==undefined)META=o.META; if(o.LOCKED!==undefined)LOCKED=o.LOCKED; },
   get(){ return {DATA,VALUES,BR,META,LOCKED}; },

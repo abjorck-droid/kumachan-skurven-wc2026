@@ -1,11 +1,12 @@
 # Scoring & Mechanics Spec — World Cup 2026 Bracket
 
-**Version 1.0 — LOCKED 2026-06-06 by Andreas & Cal.** Designed for two players (Andreas vs. Cal), 48-team World Cup, "full sicko mode" side games, broadcast-aesthetic UI.
+**Version 1.1 — LOCKED 2026-06-24 by Andreas & Cal.** (v1.0 locked 2026-06-06.) Designed for two players (Andreas vs. Cal), 48-team World Cup, "full sicko mode" side games, broadcast-aesthetic UI.
 
 This is the source-of-truth doc the front-end, the scoring engine, and the UI copy all derive from. Edit here first, then code.
 
 **Changelog**
 
+- **v1.1 (2026-06-24)** — Mulligan eligibility extended to the **Dark Horse**, agreed by both players. Same **50%** factor as a bracket-slot mulligan; the replacement must satisfy the original outside-top-16 eligibility judged against the **frozen June-11 ranking list**; the replacement may carry a still-unspent confidence token (locks at use), while any token on the original stays put. No scoring-engine change — Dark Horse is already a `Prediction` and rides the standard mulligan path; the only new work is the (not-yet-built) mulligan entry UI allowing Dark Horse as a target.
 - **v1.0 erratum (2026-06-06, late)** — Clarification, agreed by both players: within a single
   bracket round, **each team counts at most once per player**. Duplicate slot picks of the same
   team in one round are void (0 points; the lowest-numbered slot is the one that counts). The
@@ -129,6 +130,8 @@ Only the *highest tier reached* pays out (not cumulative):
 
 This is the highest single-prediction payout in the game by a wide margin. Bold picks are big swings.
 
+The Dark Horse is **mulligan-eligible** (see **The Mulligan**) — a re-pick in the post-group window scores at the standard 50%, with the replacement subject to the same outside-top-16 eligibility (frozen June-11 ranking).
+
 ---
 
 ## Per-match bonus bets (locked at each match's kickoff)
@@ -187,8 +190,10 @@ Independent of tokens. Small but accumulates — 64 matches × max 3 = 192 poten
 Each player gets one. Usage window: **after the group stage ends, before the Round of 32 begins** (June 26–28 if FIFA's draft schedule holds — confirm closer to the tournament).
 
 When used:
-- Player can re-pick **one** bracket-slot prediction. Any slot — not just R32.
+- Player can re-pick **one** bracket-slot prediction **or** their **Dark Horse**. Any bracket slot — not just R32.
 - Both the original prediction (now invalidated) and the new prediction are scored at **50% of their normal value**. This is so a mulligan recovers something even on a wrong original pick, without making the mechanic strictly better than not having one.
+- A mulliganed **Dark Horse replacement** must still be **outside the FIFA top 16 by the June-11 lock-time ranking** (the same list used for the original pick).
+- The replacement pick **may carry a still-unspent confidence token**, which locks the moment the mulligan is used. A token already attached to the original stays on the original and cannot be moved.
 - The act is **visible to the opponent the moment it's used.**
 
 ### Pundit Notes

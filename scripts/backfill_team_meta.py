@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
 backfill_team_meta.py — one-time fill of Teams.flag_emoji / kit_color_primary / fifa_ranking
-from data/team_meta_2026.json (kit hexes, flag emoji, April-2026 FIFA ranking).
+from data/team_meta_2026.json (kit hexes, flag emoji, 11 June 2026 FIFA ranking).
 
 Why: the live board's kit bars fall back to grey without kit_color_primary, and Dark Horse
 eligibility ("outside the FIFA top 16 at lock") wants fifa_ranking on record. The data file
-notes its ranking edition — if the pool re-pins to the 10 June 2026 edition, update the file
-and re-run (it's an upsert; safe to run repeatedly).
+notes its ranking edition (11 June 2026, the lock-time edition the picks were based on) — if
+the pool ever re-pins, update the file and re-run (it's an upsert; safe to run repeatedly).
 
     python3 scripts/backfill_team_meta.py --dry-run     # show what would change
     python3 scripts/backfill_team_meta.py
