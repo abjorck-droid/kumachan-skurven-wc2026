@@ -27,8 +27,9 @@ START_TOKENS = {"Double": 4, "Triple": 2, "AllIn": 1}
 # Per-match bonus-bet menu (mirrors the Pages Function; all binary Yes/No).
 BONUS_TYPES = ["BTTS", "Over 2.5 goals", "Penalty in match", "Red card in match",
                "Both teams score 2+", "Goal in first 15 min"]
-# Mulligan (spec 03 §The Mulligan, v1.1): one per player, used after the group stage and
-# before R32. Window dates are inclusive UTC and TENTATIVE — refine to FIFA's R32 schedule.
+# Mulligan (spec 03 §The Mulligan, v1.1): one per player, used before R32. The 2026 schedule has
+# NO gap (last group games June 28, R32 starts June 29), so the window opens during the final group
+# matchday. Inclusive UTC dates — MUST stay in sync with functions/api/[[route]].js MULLIGAN_WINDOW.
 MULLIGAN_WINDOW = ("2026-06-24", "2026-06-28")
 DARK_HORSE_MAX_RANK = 16              # FIFA rank > this ⇒ Dark-Horse-eligible (11 June 2026 edition)
 MULLIGAN_TYPES = {"bracket_slot", "dark_horse"}

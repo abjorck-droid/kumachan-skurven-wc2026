@@ -24,6 +24,12 @@ const START_TOKENS = { Double: 4, Triple: 2, AllIn: 1 };
 // Per-match bonus-bet menu (spec §bonus bets, all binary Yes/No; "No" on Over 2.5 = Under).
 const BONUS_TYPES = ["BTTS", "Over 2.5 goals", "Penalty in match", "Red card in match",
   "Both teams score 2+", "Goal in first 15 min"];
+// Mulligan (spec 03 §The Mulligan, v1.1): one per player, used before R32. The 2026 schedule has
+// NO gap (last group games June 28, R32 starts June 29), so the window opens during the final group
+// matchday. Inclusive UTC dates — MUST stay in sync with scripts/pickentry_server.MULLIGAN_WINDOW.
+const MULLIGAN_WINDOW = ["2026-06-24", "2026-06-28"];
+const DARK_HORSE_MAX_RANK = 16;   // FIFA rank > this ⇒ Dark-Horse-eligible (11 June 2026 edition)
+const MULLIGAN_TYPES = new Set(["bracket_slot", "dark_horse"]);
 
 const httpErr = (msg, status) => Object.assign(new Error(msg), { status });
 
@@ -370,6 +376,8 @@ async function bootstrap(env, prow) {
   return {
     player: playerName, players: [playerName], teams, sideGames: side, footballers, matches,
     tokensStart: START_TOKENS, locked, existing,
+    mulligansRemaining: pf.mulligans_remaining ?? 1,
+    mulliganWindow: MULLIGAN_WINDOW.slice(),   // single source of truth for the UI
     tokensRemaining: {
       Double: pf.tokens_remaining_double ?? 4,
       Triple: pf.tokens_remaining_triple ?? 2,
@@ -433,6 +441,135 @@ async function save(env, prow, picks) {
     } }],
   });
   return { saved: n, deleted, tokensUsed: used };
+}
+
+// ---- mulligan (mirrors scripts/pickentry_server.py) -------------------------
+// Validate one mulligan before any write — throws httpErr(…, 400), mirroring bracketGuard's
+// reject-before-write discipline. Pure: every input is passed in. Returns the original pick.
+export function mulliganGuard(targetKey, replacement, picks, teamsByCode, teamsById, mulligansRemaining, tokensRemaining, now) {
+  const today = (now ? new Date(now) : new Date()).toISOString().slice(0, 10);
+  if (!(MULLIGAN_WINDOW[0] <= today && today <= MULLIGAN_WINDOW[1]))
+    throw httpErr(`mulligan window is not open (June ${MULLIGAN_WINDOW[0].slice(-2)}–${MULLIGAN_WINDOW[1].slice(-2)})`, 400);
+  if (!(mulligansRemaining > 0)) throw httpErr("mulligan already used", 400);
+  const orig = (picks || []).find((p) => p.key === targetKey);
+  if (!orig) throw httpErr(`target pick '${targetKey}' not found among your picks`, 400);
+  if (!MULLIGAN_TYPES.has(orig.type))
+    throw httpErr(`'${targetKey}' is not a mulligan-eligible pick (only bracket slots or the Dark Horse)`, 400);
+  let newTid = replacement.team_id;
+  if (newTid == null || newTid === "") throw httpErr("replacement needs a team", 400);
+  newTid = parseInt(newTid);
+  if (orig.team_id != null && orig.team_id !== "" && parseInt(orig.team_id) === newTid)
+    throw httpErr("replacement is identical to the original pick", 400);
+  if (orig.type === "dark_horse") {
+    const team = teamsById[newTid];
+    if (!team) throw httpErr("replacement team not found", 400);
+    const rank = team.fifa_ranking;
+    if (rank == null || rank <= DARK_HORSE_MAX_RANK)
+      throw httpErr(`${team.code || newTid} is not Dark-Horse-eligible (FIFA rank ≤ ${DARK_HORSE_MAX_RANK})`, 400);
+  }
+  if (orig.type === "bracket_slot") {
+    const swapped = (picks || []).map((p) => (p.key === targetKey ? { ...p, team_id: newTid } : p));
+    bracketGuard(swapped, teamsByCode);   // nesting / dedupe / same-path — reuses the v1.0 rules
+  }
+  const tok = replacement.token;
+  if (tok && !((tokensRemaining || {})[tok] > 0))
+    throw httpErr(`no ${tok} tokens remaining for the replacement`, 400);
+  return orig;
+}
+
+// Spend the player's one mulligan to re-pick `targetKey` (a bracket slot or the Dark Horse).
+// Writes the replacement as a SIBLING row (`<player>|<key>|mull`) so the original survives and the
+// scoring engine halves BOTH; logs an idempotent Mulligans row; spends the mulligan LAST. With
+// dryRun the guard runs and the planned writes are returned under `wouldWrite`, committing nothing.
+export async function saveMulligan(env, prow, targetKey, replacement, note, dryRun, now) {
+  const playerName = (prow.fields || {}).name;
+  const playerRec = prow.id;
+  const pf = prow.fields || {};
+  const mullLeft = pf.mulligans_remaining ?? 1;
+  const tokensRemaining = {
+    Double: pf.tokens_remaining_double ?? 4,
+    Triple: pf.tokens_remaining_triple ?? 2,
+    AllIn: pf.tokens_remaining_allin ?? 1,
+  };
+
+  const teamMap = {}, teamsByCode = {}, teamsById = {}, rec2tid = {};
+  for (const r of await atList(env, "Teams", ["team_id", "code", "group", "fifa_ranking"])) {
+    const f = r.fields || {};
+    if (f.team_id == null) continue;
+    const tid = parseInt(f.team_id);
+    teamMap[tid] = r.id; rec2tid[r.id] = tid;
+    const info = { team_id: tid, code: f.code, group: f.group, fifa_ranking: f.fifa_ranking };
+    teamsById[tid] = info;
+    if (f.code) teamsByCode[f.code] = info;
+  }
+
+  // reconstruct the player's CURRENT picks + remember each pick's record id
+  const picks = [], recOf = {};
+  for (const r of await atList(env, "Predictions")) {
+    const f = r.fields || {};
+    const lbl = f.label || "";
+    if (!lbl.startsWith(playerName + "|")) continue;
+    const key = lbl.split("|").slice(1).join("|");
+    const ptype = f.prediction_type;
+    const link = f.predicted_team || [];
+    const tid = link.length ? rec2tid[link[0]] : null;
+    if (ptype === "bracket_slot")
+      picks.push({ key, type: "bracket_slot", bracket_slot: f.bracket_slot || key, team_id: tid });
+    else if (ptype === "bracket_struct")
+      picks.push({ key, type: "bracket_struct", bracket_slot: f.bracket_slot || key, player_text: f.predicted_text });
+    else if (ptype === "dark_horse")
+      picks.push({ key, type: "dark_horse", side_game: "Dark Horse", team_id: tid });
+    recOf[key] = r.id;
+  }
+
+  const orig = mulliganGuard(targetKey, replacement, picks, teamsByCode, teamsById, mullLeft, tokensRemaining, now);
+  const origRec = recOf[targetKey];
+  if (!origRec) throw httpErr(`original prediction row for '${targetKey}' not found`, 400);
+
+  const stamp = (now ? new Date(now) : new Date()).toISOString().replace(/\.\d{3}Z$/, "Z");
+  const newLabel = `${playerName}|${targetKey}|mull`;
+  const sgMap = {};
+  for (const r of await atList(env, "SideGames", ["name"])) sgMap[r.fields.name] = r.id;
+  const tok = replacement.token;
+  const newPick = { key: `${targetKey}|mull`, type: orig.type, team_id: replacement.team_id };
+  if (orig.type === "bracket_slot") newPick.bracket_slot = orig.bracket_slot || targetKey;
+  if (orig.type === "dark_horse") newPick.side_game = "Dark Horse";
+  if (tok) newPick.token = tok;
+  const recFields = predictionFields(playerName, newPick, teamMap, playerRec, sgMap);
+  recFields.locked_at = stamp;
+
+  const patch = { mulligans_remaining: 0 };
+  if (tok) {
+    const field = { Double: "tokens_remaining_double", Triple: "tokens_remaining_triple", AllIn: "tokens_remaining_allin" }[tok];
+    patch[field] = Math.max(0, (tokensRemaining[tok] || 0) - 1);
+  }
+
+  const newTeam = teamsById[parseInt(replacement.team_id)] || {};
+  const summary = {
+    mulliganed: targetKey, new_label: newLabel, replacement_type: orig.type,
+    replacement_team: replacement.team_id, replacement_code: newTeam.code,
+    original_team: orig.team_id, token: tok || null,
+  };
+
+  if (dryRun)
+    return { ...summary, dryRun: true, committed: false, mulligans_remaining: mullLeft,
+      wouldWrite: { replacement: recFields,
+        mulligan_link: { original_prediction: [origRec], new_prediction: "(created on commit)" },
+        budget_patch: patch } };
+
+  // commit: replacement row, then the Mulligans log, then the budget (last, so a crash before the
+  // budget write leaves the mulligan spendable and the swap re-doable)
+  await atUpsert(env, "Predictions", [recFields], ["label"]);
+  const newRec = ((await atList(env, "Predictions", ["label"])).find((r) => (r.fields.label) === newLabel) || {}).id;
+  const existing = await atList(env, "Mulligans", ["original_prediction"]);
+  const already = existing.some((m) => ((m.fields || {}).original_prediction || []).includes(origRec));
+  if (newRec && !already)
+    await atReq(env, "POST", `${env.AIRTABLE_BASE_ID}/Mulligans`, {
+      records: [{ fields: { pool_player: [playerRec], used_at: stamp,
+        original_prediction: [origRec], new_prediction: [newRec], note: note || "" } }],
+      typecast: true });
+  await atReq(env, "PATCH", `${env.AIRTABLE_BASE_ID}/PoolPlayers`, { records: [{ id: playerRec, fields: patch }] });
+  return { ...summary, committed: true, mulligans_remaining: 0 };
 }
 
 // ---- per-match bonus bets ---------------------------------------------------
@@ -752,6 +889,10 @@ export async function onRequest(context) {
     if (path.endsWith("/api/savebonus") && request.method === "POST") {
       const body = await request.json().catch(() => ({}));
       return json(await saveBonus(env, prow, body.picks || []));
+    }
+    if (path.endsWith("/api/mulligan") && request.method === "POST") {
+      const body = await request.json().catch(() => ({}));
+      return json(await saveMulligan(env, prow, body.target, body.replacement || {}, body.note || "", !!body.dryRun));
     }
     return json({ error: "not found" }, 404);
   } catch (e) {

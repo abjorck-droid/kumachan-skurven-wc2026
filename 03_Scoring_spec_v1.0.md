@@ -187,7 +187,7 @@ Independent of tokens. Small but accumulates — 64 matches × max 3 = 192 poten
 
 ### The Mulligan
 
-Each player gets one. Usage window: **after the group stage ends, before the Round of 32 begins** (June 26–28 if FIFA's draft schedule holds — confirm closer to the tournament).
+Each player gets one. Usage window: **before the Round of 32 begins**. The final 2026 schedule has **no gap** between the group stage and the knockouts (last group games June 28, R32 starts June 29), so the window opens during the final group matchday: **June 24–28** (inclusive). A choice made before all groups finish simply has *less* hindsight — in keeping with the mulligan's blind-swing spirit.
 
 When used:
 - Player can re-pick **one** bracket-slot prediction **or** their **Dark Horse**. Any bracket slot — not just R32.
@@ -236,7 +236,7 @@ When used:
 | Bracket ladder (R16 through Champion), Dark Horse, all season-long side games, all 72 group-stage outcome/score picks | **At tournament kickoff** (2026-06-11) |
 | Knockout outcome/score picks (pairings unknown until the group stage ends) | **At that match's kickoff** — entry flow not yet built; in/out decision pending |
 | Per-match bonus bets | **At that match's kickoff** — entry flow not yet built; in/out decision pending |
-| Mulligan use | **Window: June 26–28** (after group stage, before R32) |
+| Mulligan use | **Window: June 24–28** (opens during the final group matchday; before R32, which starts June 29) |
 
 Nothing locks before tournament start except the tournament itself. Once kickoff happens, nearly everything is set in stone.
 

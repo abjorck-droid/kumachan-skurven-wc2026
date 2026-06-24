@@ -8,7 +8,7 @@ The mulligan is the one pick-entry flow never built — the handoffs always slat
 
 - Let a player spend their **one** mulligan to re-pick **one** target: any bracket slot (R16/QF/SF/Finalist/Champion) **or** their Dark Horse.
 - Enforce eligibility and consume the mulligan irreversibly.
-- Be live **only during the window** (June 26–28, tentative on FIFA's draft schedule — keep the dates in config, not hardcoded).
+- Be live **only during the window**. The final 2026 schedule has **no gap** (last group games June 28, R32 June 29), so the window is **June 24–28** — it opens during the final group matchday. Dates live in config (`MULLIGAN_WINDOW`), not hardcoded in the UI.
 - Reuse what already exists: `bracket_guard` (nesting + dedupe), the `dark_horse_eligible` rule (`fifa_ranking > 16`), the `RuntimeError`-fragment guard style, and the full-replace `save` discipline.
 
 ## Data already in place

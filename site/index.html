@@ -692,7 +692,7 @@ function setTab(name){
 // ---- Mulligan (post-lock, June 26–28): re-pick one bracket slot OR the Dark Horse ----
 // The window comes from the server (bootstrap → DATA.mulliganWindow), so it's edited in ONE
 // place: pickentry_server.MULLIGAN_WINDOW. The literal here is only a fallback for a stale bootstrap.
-function mullWindow(){ return (DATA && DATA.mulliganWindow) || ["2026-06-26","2026-06-28"]; }
+function mullWindow(){ return (DATA && DATA.mulliganWindow) || ["2026-06-24","2026-06-28"]; }
 function mullWindowState(){ const w=mullWindow(), d=new Date().toISOString().slice(0,10);
   return d<w[0]?"before":(d>w[1]?"after":"open"); }
 function slotLabel(k){
