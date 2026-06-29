@@ -195,6 +195,7 @@
   .outmark{color:var(--bad);font-family:'Antonio',sans-serif;font-size:10px;letter-spacing:.08em;text-transform:uppercase}
   .mullmark{color:var(--text-mute);border:1px solid var(--text-mute);border-radius:3px;padding:0 3px;font-size:9px;letter-spacing:.06em;text-transform:uppercase;vertical-align:middle}
   .mullfrom{color:var(--text-dim);font-size:11px}
+  .bk-slot .mullmark{border:none;padding:0;margin-left:3px;font-size:10px}
   .bk-slot.lost .code{text-decoration:line-through;opacity:.65}
   .bk-slot .outmark{margin-left:4px}
   .bk-champ .tm.dead,.bk-champ .team.dead{text-decoration:line-through}
@@ -901,9 +902,13 @@ function bkChip(no, opts){
     var won=(fin&&tid===m.winner_id)?'<span class="won">✓</span>':"";
     var lost=fin&&tid!=null&&tid!==m.winner_id;
     var pickDead=lost&&((inA&&!inA.resolved)||(inC&&!inC.resolved)); // someone picked this team to advance — pick is dead
+    // mark a team a player reached here via a mulligan replacement (mode-aware)
+    var mull=(((BRK_MODE==="A"||BRK_MODE==="H")&&inA&&inA.mulliganed)||
+              ((BRK_MODE==="C"||BRK_MODE==="H")&&inC&&inC.mulliganed));
     rows+='<div class="bk-slot '+pcls+(lost?" lost":"")+'"><span class="kit" style="background:'+kit+'"></span>'+
       '<span class="code">'+(t&&t.flag?esc(t.flag)+" ":"")+esc(code)+won+
-      (pickDead?'<span class="outmark">✕</span>':"")+'</span><span class="src">'+esc(src)+'</span></div>';
+      (pickDead?'<span class="outmark">✕</span>':"")+
+      (mull?'<span class="mullmark" title="mulligan replacement">↺</span>':"")+'</span><span class="src">'+esc(src)+'</span></div>';
   }
   var tok=tokTags.length?'<span class="bk-tok">'+tokTags.map(function(t){
     return '<i class="ow '+t.by+'"></i>'+esc(t.label);}).join(" ")+'</span>':"";

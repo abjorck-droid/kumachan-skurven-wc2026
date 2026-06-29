@@ -152,6 +152,16 @@ const tree2 = Object.assign({}, tree, { KOIDX: { 101: { status: "Live", winner_i
 vm.createContext(tree2);
 vm.runInContext(grab("bkChip"), tree2, { filename: "live.html#tree2" });
 check("tree chip: live match — no strike, no ✕", !vm.runInContext("bkChip(101)", tree2).includes("lost"));
+check("tree chip: non-mulligan pick has no ↺", !vm.runInContext("bkChip(101)", tree2).includes("↺"));
+
+// bracket chip flags a slot reached via a mulligan replacement
+const tree3 = Object.assign({}, tree, {
+  KOIDX: { 101: { status: "Scheduled", winner_id: null, home_id: 5, away_id: 1 } },
+  LSETS: { Andreas: { Finalist: { 1: { team_id: 1, mulliganed: true } } }, Cal: {} },
+});
+vm.createContext(tree3);
+vm.runInContext(grab("bkChip"), tree3, { filename: "live.html#tree3" });
+check("tree chip: mulligan replacement slot shows ↺", vm.runInContext("bkChip(101)", tree3).includes("↺"));
 
 // ---- resolveMulligans: sibling "<slot>|mull" overrides the original locked pick ----
 // A mulligan replacement is written as a sibling row; slot-keyed renderers must show

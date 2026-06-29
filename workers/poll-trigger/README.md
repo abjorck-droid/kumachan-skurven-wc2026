@@ -43,8 +43,12 @@ dashboard under Metrics → Errors; logs via Worker → Logs → Begin log strea
 
 - API-Football budget: paid plan, 7,500 req/day. 96 dispatches/day × (1 fixtures
   call + 1 events call per live/finished match) ≈ 200–900/day worst case. Plenty.
-- `leaderboards-poll.yml` stays on GitHub's daily cron — daily schedules have
-  been firing fine, and standings aren't latency-sensitive.
+- `leaderboards-poll.yml` is now also dispatched by this Worker — once daily on the
+  ~04:00 UTC tick — so the group standings that feed the live board's 3rd-place
+  elimination can't go stale if GitHub's daily cron is throttled. The workflow keeps
+  its own `schedule:` (04:10 UTC) as a backup, and the same `GH_PAT` (Actions:
+  read/write) authorizes it — no new setup. **After updating worker.js, redeploy the
+  Worker** (dashboard → Edit code → paste → Deploy); the `*/15` cron trigger is unchanged.
 - The workflow keeps its `schedule:` block as a free backup heartbeat; the
   `concurrency: scoreboard-poll` group prevents overlapping runs.
 - The Worker self-skips outside 2026-06-10 → 2026-07-21, so it can stay
