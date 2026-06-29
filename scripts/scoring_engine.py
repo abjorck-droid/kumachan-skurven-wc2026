@@ -57,6 +57,14 @@ MULLIGAN_FACTOR = 0.5
 EXPECTED_IN_TIER = {"R16": 16, "QF": 8, "SF": 4, "Finalist": 2}   # for "tier complete" tests
 BRACKET_TO_MATCHTIER = {"R16": "R16", "QF": "QF", "SF": "SF", "Finalist": "Final"}
 
+# A knockout WIN means the team reached the next round's tier. Bracket/dark-horse
+# scoring keys off teams_in_match_tier[<reached tier>]; without propagating winners
+# forward, an R32 result credits NOTHING until the API later publishes the R16
+# fixture containing that team — so a correct R32-winner pick (and a mulligan onto
+# an R32 winner) would score 0 for days. Maps a finished match's tier -> the tier
+# its winner has thereby reached. (Final winner is the Champion, handled separately.)
+NEXT_REACHED = {"R32": "R16", "R16": "QF", "QF": "SF", "SF": "Final"}
+
 # Knockout round-name strings aren't in the API feed yet. Fill exact strings here
 # once they publish, e.g. {"Round of 32": "R32", "8th Finals": "R16"}.
 ROUND_TIER_OVERRIDES = {}
@@ -114,6 +122,20 @@ def team_reached(team_id, btier, teams_in_match_tier, champion_id):
         return champion_id is not None and team_id == champion_id
     mt = BRACKET_TO_MATCHTIER.get(btier)
     return team_id in teams_in_match_tier.get(mt, set())
+
+def reached_via_winners(finished_ko):
+    """Propagate knockout winners one round forward. `finished_ko` is an iterable of
+    (tier, winner_id) for FINISHED matches; returns {reached_tier: set(team_id)}. A team
+    that wins a round has REACHED the next round's tier (R32 win -> R16, R16 -> QF, ...).
+    This is what makes an R32 result actually score a bracket/dark-horse pick instead of
+    waiting for the API to publish the next-round fixture. (Final winner = Champion,
+    handled separately.) Pure and order-independent."""
+    out = {}
+    for tier, w in finished_ko:
+        nxt = NEXT_REACHED.get(tier)
+        if nxt and w is not None:
+            out.setdefault(nxt, set()).add(w)
+    return out
 
 def tier_complete(btier, teams_in_match_tier, final_done):
     if btier == "Champion":
@@ -355,6 +377,13 @@ def main():
             w = match_by_rec[r["id"]]["winner"]
             if w is not None:
                 champion_id = w
+
+    # Advance knockout winners into the tier they thereby reached, so an R32/R16/...
+    # result scores its bracket + dark-horse picks immediately (see reached_via_winners).
+    for rtier, ids in reached_via_winners(
+            (m["tier"], m["winner"]) for m in match_by_rec.values()
+            if m["status"] == "Finished").items():
+        teams_in_match_tier.setdefault(rtier, set()).update(ids)
 
     # --- pass 1: base points + resolved per prediction ---
     base_pts = {}        # pred rec -> base points (pre-token)

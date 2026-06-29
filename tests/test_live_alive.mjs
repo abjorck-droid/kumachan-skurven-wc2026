@@ -59,9 +59,27 @@ check("best 8 thirds alive", !elim[103] && !elim[131]);          // thirds ranks
 check("thirds ranked 9-12 out", elim[135] && elim[139] && elim[143] && elim[147]);
 check("group winners and runners-up alive", !elim[101] && !elim[102] && !elim[145] && !elim[146]);
 
-// ---- all groups done but thirds ranking missing: rank 3 stays pending ---------
+// ---- all groups done, no thirds table AND no ranking data: stay conservative ---
+// groupRows() carries no points, so the bottom-4 can't be ranked → mark none out.
 elim = T.eliminatedSet({ standings: st, matches: [] });
-check("no thirds table → no third marked out", GROUPS.split("").every((g, gi) => !elim[100 + gi * 4 + 3]));
+check("no thirds table & no ranking data → no third marked out", GROUPS.split("").every((g, gi) => !elim[100 + gi * 4 + 3]));
+
+// ---- all groups done, no thirds table, but group tables carry ranking data ----
+// API-Football has no best-thirds table, so eliminatedSet derives it from the 12
+// group tables (points, then goal diff, then goals for) and cuts the bottom four.
+let st3 = groupRows([3, 3, 3, 3]);
+st3.forEach(s => { if (s.rank === 3) { const gi = GROUPS.indexOf(s.group); s.points = 12 - gi; s.gd = 0; s.gf = 0; } });
+elim = T.eliminatedSet({ standings: st3, matches: [] });
+check("derived thirds: bottom 4 (groups I–L) out", elim[135] && elim[139] && elim[143] && elim[147]);
+check("derived thirds: best 8 (groups A–H) alive", "ABCDEFGH".split("").every((g, i) => !elim[100 + i * 4 + 3]));
+check("derived thirds: all 12 rank-4 still out", GROUPS.split("").every((g, gi) => elim[100 + gi * 4 + 4]));
+check("derived thirds: exactly 16 out (12 fourths + 4 thirds)", Object.keys(elim).length === 16);
+
+// tie-break: equal points → lower goal diff is eliminated
+let st4 = groupRows([3, 3, 3, 3]);
+st4.forEach(s => { if (s.rank === 3) { const gi = GROUPS.indexOf(s.group); s.points = 3; s.gd = 12 - gi; s.gf = 0; } });
+elim = T.eliminatedSet({ standings: st4, matches: [] });
+check("derived thirds tie-break uses goal diff", elim[135] && elim[139] && elim[143] && elim[147] && !elim[103]);
 
 // ---- knockouts -----------------------------------------------------------------
 const ko = (round, home, away, winner, status) =>
@@ -134,6 +152,31 @@ const tree2 = Object.assign({}, tree, { KOIDX: { 101: { status: "Live", winner_i
 vm.createContext(tree2);
 vm.runInContext(grab("bkChip"), tree2, { filename: "live.html#tree2" });
 check("tree chip: live match — no strike, no ✕", !vm.runInContext("bkChip(101)", tree2).includes("lost"));
+
+// ---- resolveMulligans: sibling "<slot>|mull" overrides the original locked pick ----
+// A mulligan replacement is written as a sibling row; slot-keyed renderers must show
+// the replacement, not the original, or the swap is invisible (the live-board bug).
+const dhList = [
+  { key: "darkhorse", type: "dark_horse", team_id: 777 },            // original (Türkiye)
+  { key: "darkhorse|mull", type: "dark_horse", team_id: 5 },         // replacement
+  { key: "R16-1", type: "bracket_slot", bracket_slot: "R16-1", team_id: 99 },
+  { key: "R16-1|mull", type: "bracket_slot", bracket_slot: "R16-1", team_id: 5529 },
+  { key: "QF-2", type: "bracket_slot", bracket_slot: "QF-2", team_id: 31 },   // untouched
+];
+const rm = T.resolveMulligans(dhList);
+const byKey = Object.fromEntries(rm.map(p => [p.key, p]));
+check("resolveMulligans: dark horse shows replacement team", byKey["darkhorse"].team_id === 5);
+check("resolveMulligans: dark horse flagged + remembers original", byKey["darkhorse"].mulliganed === true && byKey["darkhorse"].was_team_id === 777);
+check("resolveMulligans: bracket slot shows replacement team", byKey["R16-1"].team_id === 5529 && byKey["R16-1"].bracket_slot === "R16-1");
+check("resolveMulligans: untouched pick passes through", byKey["QF-2"].team_id === 31 && !byKey["QF-2"].mulliganed);
+check("resolveMulligans: no '|mull' keys leak through", rm.every(p => !/\|mull$/.test(p.key)));
+check("resolveMulligans: pick count collapses siblings (5→3)", rm.length === 3);
+check("resolveMulligans: empty + null tolerated", T.resolveMulligans([]).length === 0 && T.resolveMulligans(null).length === 0);
+
+// the replacement, not the original, drives bracket-advance highlighting (ladderSets)
+const ls = T.ladderSets({ picks: { Andreas: dhList } });
+check("ladderSets: replacement team in tier set", !!(ls.Andreas.R16 && ls.Andreas.R16[5529]));
+check("ladderSets: original team NOT in tier set", !(ls.Andreas.R16 && ls.Andreas.R16[99]));
 
 console.log(`test_live_alive: ${PASS}/${PASS + FAIL} checks passed`);
 process.exit(FAIL ? 1 : 0);

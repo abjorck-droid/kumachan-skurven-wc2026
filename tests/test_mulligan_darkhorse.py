@@ -89,5 +89,27 @@ for base in (0, 5, 25, 75, 200, 500, 1000):
             check(f"equiv base={base} tok={tok} mull={mull}",
                   se.finalize_points(base, tok, mull) == old)
 
+# ---- knockout winners advance one round (R32 result must score) -------------
+# A team that WINS its R32 match has reached the R16; the bracket/dark-horse scorers
+# read teams_in_match_tier, so the winner must be propagated there. Regression intent:
+# if winners stop advancing, an R32 result scores nothing until R16 fixtures publish.
+r = se.reached_via_winners([("R32", 5529)])               # Canada wins its R32
+check("R32 winner reaches R16", r == {"R16": {5529}})
+check("R32 winner makes team_reached(R16) true",
+      se.team_reached(5529, "R16", r, None) is True)
+check("R32 winner advances the dark-horse ladder to R16=25",
+      se.dark_horse_payout(5529, r, None) == 25)
+chain = se.reached_via_winners([("R32", 1), ("R16", 1), ("QF", 1), ("SF", 1)])
+check("winners chain R32->R16->QF->SF->Final",
+      chain == {"R16": {1}, "QF": {1}, "SF": {1}, "Final": {1}})
+check("a LOSER (non-winner) is never advanced",
+      se.reached_via_winners([("R32", None)]) == {})
+check("group results don't advance anyone",
+      se.reached_via_winners([("group", 5529)]) == {})
+check("Final winner is NOT auto-advanced here (Champion handled separately)",
+      "Champion" not in se.reached_via_winners([("Final", 7)]))
+check("multiple R32 winners accumulate in R16",
+      se.reached_via_winners([("R32", 1), ("R32", 2)]) == {"R16": {1, 2}})
+
 print(f"\n{PASS} passed, {FAIL} failed")
 sys.exit(1 if FAIL else 0)
