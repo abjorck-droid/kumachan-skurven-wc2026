@@ -3,7 +3,7 @@
 poller.py — World Cup 2026 live data poller.
 
 Two modes:
-  scoreboard   (default) — upsert today's fixtures into Matches (scores, status, round,
+  scoreboard   (default) — upsert yesterday/today/tomorrow's fixtures into Matches (scores, status, round,
                 team links, winner), fetch events_json for live/finished matches, log to PollLog.
   leaderboards — upsert group Standings from the API.
 
@@ -160,13 +160,14 @@ def at_create(base, table, pat, fields, dry=False):
 # ---- transforms (pure — unit-tested) ---------------------------------------
 def to_match_fields(fx, team_map, now_iso):
     """Map one API-Football fixture object to a Matches record's fields dict."""
-    f = fx["fixture"]; tms = fx["teams"]; goals = fx.get("goals", {})
+    f = fx["fixture"]; tms = fx.get("teams") or {}; goals = fx.get("goals", {})
     short = (f.get("status") or {}).get("short", "NS")
-    home, away = tms["home"], tms["away"]
+    # KO fixtures can be published before their pairings — team objects null/absent.
+    home, away = (tms.get("home") or {}), (tms.get("away") or {})
     venue = (f.get("venue") or {})
     rec = {
         "fixture_id": f["id"],
-        "label": f"{home.get('name','?')} v {away.get('name','?')}",
+        "label": f"{home.get('name') or '?'} v {away.get('name') or '?'}",
         "kickoff_utc": f.get("date"),
         "round": (fx.get("league") or {}).get("round"),
         "status": status_of(short),
@@ -240,10 +241,17 @@ def poll_dates(utc_today, target_date=None):
     automated run therefore polls yesterday AND today; re-touching yesterday's
     now-final fixtures is harmless (idempotent upsert keyed on fixture_id, events
     already stored). An explicit --date polls only that one day, for backfills.
+
+    Tomorrow is polled too (seen 2026-07-05): this same query CREATES fixture rows,
+    and a late-US-evening game (e.g. ENG v MEX, 02:00 UTC kickoff) buckets under the
+    NEXT UTC date — without tomorrow its row doesn't exist until the UTC day rolls
+    over, so the bonus-bet tab reports "everything has kicked off" all evening.
+    One extra API call per run. (The daily leaderboards run also refreshes the FULL
+    season schedule, so rows normally exist days ahead; this is the fresh backstop.)
     """
     if target_date:
         return [target_date]
-    return [utc_today - dt.timedelta(days=1), utc_today]
+    return [utc_today - dt.timedelta(days=1), utc_today, utc_today + dt.timedelta(days=1)]
 
 # ---- shared ----------------------------------------------------------------
 def build_team_map(base, pat):
@@ -379,6 +387,23 @@ def run_leaderboards(keys, dry, force):
         if stale:
             pruned = at_delete(base, "Standings", pat, stale, dry=dry)
             print(f"· pruned {pruned} stale Standings rows{' (dry)' if dry else ''}")
+    # Full season-schedule refresh (1 call/day). Future fixtures must EXIST in Matches
+    # for the bonus-bet tab to offer them; the scoreboard run only creates rows for
+    # yesterday/today/tomorrow. This upserts every fixture API-Football has published
+    # (KO rows appear here as soon as pairings land), same idempotent path as
+    # load_fixtures.py. Regression: 2026-07-05, ENG v MEX (02:00 UTC next-day bucket)
+    # had no row on the evening of the 5th → "everything has kicked off".
+    fx_body, remaining = api_get("fixtures", key, league=LEAGUE, season=SEASON); calls += 1
+    fx = fx_body.get("response", [])
+    if fx_body.get("errors") and (fx_body["errors"] if isinstance(fx_body["errors"], list) else list(fx_body["errors"].values())):
+        errors.append(f"season fixtures errors: {fx_body['errors']}")
+    if fx:
+        now_iso = dt.datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
+        m_records = [to_match_fields(x, team_map, now_iso) for x in fx]
+        m_touched = at_upsert(base, "Matches", pat, m_records, ["fixture_id"], dry=dry)
+        print(f"· schedule refresh: {len(fx)} fixtures from API → upserted {m_touched} Matches{' (dry)' if dry else ''}")
+    else:
+        print("  ⚠ schedule refresh: API returned no fixtures — Matches left untouched")
     write_poll_log(base, pat, "leaderboards-poll", calls, remaining, touched, " | ".join(errors), dry)
     print(f"· done. api calls: {calls}, rate-limit remaining: {remaining}")
 

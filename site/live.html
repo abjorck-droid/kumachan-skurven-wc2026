@@ -188,7 +188,7 @@
   .ttag{display:inline-flex;align-items:center;gap:6px;font-family:'Antonio',sans-serif;font-size:13px;font-weight:600;
     letter-spacing:.05em;border:1px solid var(--border-strong);border-radius:5px;padding:5px 9px;background:var(--card-soft)}
   .ttag .kit{width:4px;height:14px;border-radius:2px}
-  .ttag.both{background:linear-gradient(90deg, rgba(33,158,188,0.15), rgba(251,133,0,0.13));border-color:var(--border-strong)}
+  .ttag.both{background:linear-gradient(90deg, var(--p1-soft), var(--p2-soft));border-color:var(--border-strong)}
   .ttag.hit{border-color:rgba(90,222,140,.5)} .ttag.hit .code{color:var(--good)}
   .ttag.miss{opacity:.45} .ttag.miss .code{text-decoration:line-through}
   .ttag.dead{opacity:.55;border-color:rgba(255,90,90,.4)} .ttag.dead .code{text-decoration:line-through}
@@ -225,7 +225,10 @@
   .bk-legend .sw.tok{background:var(--gold)}
   .bk-scroll{overflow-x:auto;overflow-y:hidden;padding-bottom:14px;-webkit-overflow-scrolling:touch}
   .bk-fitbox{position:relative}
-  .bk-bracket{position:relative;display:flex;align-items:stretch;height:760px;min-width:1380px}
+  /* min-width MUST cover the columns' summed flex-basis (8×158 + 196 = 1460) or the
+     flex items overflow the box, offsetWidth under-reports, and Fit clips the right
+     R32 column (regression 2026-07-05). bkLayout also measures scrollWidth as a net. */
+  .bk-bracket{position:relative;display:flex;align-items:stretch;height:760px;min-width:1460px}
   #bk-wires{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:0}
   .bk-col{display:flex;flex-direction:column;width:158px;flex:0 0 158px;z-index:1}
   .bk-col.final-col{width:196px;flex:0 0 196px}
@@ -244,7 +247,7 @@
   .bk-slot.pa::before{content:'';position:absolute;left:0;top:0;bottom:0;width:2px;background:var(--p1)}
   .bk-slot.pc{background:var(--p2-soft)} .bk-slot.pc .code{color:var(--p2)}
   .bk-slot.pc::before{content:'';position:absolute;left:0;top:0;bottom:0;width:2px;background:var(--p2)}
-  .bk-slot.pboth{background:linear-gradient(90deg,rgba(33,158,188,.15),rgba(251,133,0,.13))}
+  .bk-slot.pboth{background:linear-gradient(90deg,var(--p1-soft),var(--p2-soft))}
   .bk-slot.pboth .code{color:var(--text)}
   .bk-slot.pboth::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;
     background:linear-gradient(180deg,var(--p1) 50%,var(--p2) 50%)}
@@ -593,6 +596,17 @@ function deadPickCount(D, elim){
   });
   return n;
 }
+function softColor(hex, alpha){
+  // "#219ebc" (or "#abc") → "rgba(33, 158, 188, 0.16)" — the translucent fill that
+  // must FOLLOW each player's display_color. Regression 2026-07-05: --p1/--p2 were
+  // set from PoolPlayers at runtime but the -soft shades stayed hard-coded blue/orange,
+  // so with Cal as players[0] every tree cell had the right edge bar and the WRONG shading.
+  var m=/^#?([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.exec(String(hex||"").trim());
+  if(!m) return null;
+  var h=m[1]; if(h.length===3) h=h[0]+h[0]+h[1]+h[1]+h[2]+h[2];
+  var n=parseInt(h,16);
+  return "rgba("+((n>>16)&255)+", "+((n>>8)&255)+", "+(n&255)+", "+alpha+")";
+}
 /* ====================== PURE-END ====================== */
 
 var D=null, IDX=null, ACTIVE="board", LAST_FETCH=0;
@@ -630,6 +644,10 @@ function header(){
   if(P1().name&&P2().name) $("#subtitle").textContent=P1().name+" v "+P2().name+" · Head-to-head";
   document.documentElement.style.setProperty("--p1", P1().color||"#219ebc");
   document.documentElement.style.setProperty("--p2", P2().color||"#fb8500");
+  // keep the translucent fills in lockstep with the player colors (see softColor)
+  var s1=softColor(P1().color||"#219ebc",0.16), s2=softColor(P2().color||"#fb8500",0.15);
+  if(s1) document.documentElement.style.setProperty("--p1-soft", s1);
+  if(s2) document.documentElement.style.setProperty("--p2-soft", s2);
 }
 
 /* ---- match cards (mockup 04, live) ---- */
@@ -970,6 +988,8 @@ function bkWires(){
   var bracket=document.getElementById("bk-bracket"), svg=document.getElementById("bk-wires");
   if(!bracket||!svg) return;
   var cont=bracket.getBoundingClientRect();
+  // viewBox mirrors the svg's rendered size (CSS 100% of the bracket box) so wire
+  // coordinates stay 1:1 — .bk-bracket's min-width must cover the columns (see CSS).
   svg.setAttribute("viewBox","0 0 "+bracket.offsetWidth+" "+bracket.offsetHeight);
   while(svg.firstChild) svg.removeChild(svg.firstChild);
   var elbow=function(child,parent,leftSide){
@@ -1000,7 +1020,10 @@ function bkLayout(){
   if(narrow) return;
   bracket.style.transform="none"; fitbox.style.width=""; fitbox.style.height="";
   bkWires();
-  var nW=bracket.offsetWidth, nH=bracket.offsetHeight;
+  // scrollWidth catches flex-item overflow beyond the box (offsetWidth alone
+  // under-reported when min-width lagged the columns' true width → right-edge clip)
+  var nW=Math.max(bracket.scrollWidth,bracket.offsetWidth),
+      nH=Math.max(bracket.scrollHeight,bracket.offsetHeight);
   if(BRK_ZOOM==="fit"){
     var s=Math.min(1, scroll.clientWidth/nW);
     bracket.style.transformOrigin="top left";

@@ -188,5 +188,36 @@ const ls = T.ladderSets({ picks: { Andreas: dhList } });
 check("ladderSets: replacement team in tier set", !!(ls.Andreas.R16 && ls.Andreas.R16[5529]));
 check("ladderSets: original team NOT in tier set", !(ls.Andreas.R16 && ls.Andreas.R16[99]));
 
+// ---- softColor: -soft fills must FOLLOW the runtime player colors ------------
+// Regression 2026-07-05: --p1/--p2 came from PoolPlayers but --p1-soft/--p2-soft
+// stayed hard-coded blue/orange → with Cal as players[0], every bracket-tree cell
+// had the correct edge bar and FLIPPED shading.
+check("softColor: 6-digit hex → rgba", T.softColor("#219ebc", 0.16) === "rgba(33, 158, 188, 0.16)");
+check("softColor: Cal's orange", T.softColor("#fb8500", 0.15) === "rgba(251, 133, 0, 0.15)");
+check("softColor: 3-digit hex expands", T.softColor("#abc", 0.2) === "rgba(170, 187, 204, 0.2)");
+check("softColor: missing '#' tolerated", T.softColor("219ebc", 0.16) === "rgba(33, 158, 188, 0.16)");
+check("softColor: garbage → null (CSS defaults keep working)", T.softColor("periwinkle", 0.16) === null);
+check("softColor: null/empty → null", T.softColor(null, 0.16) === null && T.softColor("", 0.16) === null);
+// wiring: the runtime setter exists, and no hard-coded both-gradient remains in CSS
+check("softColor: --p1-soft set from player color at runtime", /setProperty\("--p1-soft"/.test(html));
+check("softColor: .pboth gradient uses the CSS vars", /\.bk-slot\.pboth\{background:linear-gradient\(90deg,var\(--p1-soft\),var\(--p2-soft\)\)/.test(html));
+check("softColor: .ttag.both gradient uses the CSS vars", /\.ttag\.both\{background:linear-gradient\(90deg, ?var\(--p1-soft\), ?var\(--p2-soft\)\)/.test(html));
+
+// ---- bracket-tree Fit view: min-width must cover the columns' summed width ----
+// Regression 2026-07-05: columns totalled 1460px but min-width said 1380px, so
+// offsetWidth under-reported the content, Fit scaled by the wrong ratio, and the
+// right Round-of-32 column was clipped (fit mode hides overflow-x).
+{
+  const colW   = parseInt((/\.bk-col\{[^}]*flex:0 0 (\d+)px/.exec(html) || [])[1], 10);
+  const finalW = parseInt((/\.bk-col\.final-col\{[^}]*flex:0 0 (\d+)px/.exec(html) || [])[1], 10);
+  const minW   = parseInt((/\.bk-bracket\{[^}]*min-width:(\d+)px/.exec(html) || [])[1], 10);
+  const sideCols = (html.match(/side:"[LR]",head:/g) || []).length;   // BR_COLS entries
+  check("tree CSS: column widths parsed", !isNaN(colW) && !isNaN(finalW) && !isNaN(minW));
+  check("tree CSS: 8 side columns + 1 final column", sideCols === 8);
+  check("tree CSS: min-width covers summed column width (" + (sideCols * colW + finalW) + "px)",
+        minW >= sideCols * colW + finalW);
+  check("tree JS: Fit measures scrollWidth as an overflow net", /Math\.max\(bracket\.scrollWidth,bracket\.offsetWidth\)/.test(html));
+}
+
 console.log(`test_live_alive: ${PASS}/${PASS + FAIL} checks passed`);
 process.exit(FAIL ? 1 : 0);

@@ -22,13 +22,18 @@ def check(label, cond):
 
 TODAY = dt.date(2026, 6, 14)
 YESTERDAY = dt.date(2026, 6, 13)
+TOMORROW = dt.date(2026, 6, 15)
 
-# ---- automated run: yesterday + today ---------------------------------------
+# ---- automated run: yesterday + today + tomorrow -----------------------------
+# Tomorrow is the 2026-07-05 regression: a late-US-evening game (ENG v MEX,
+# 02:00 UTC) buckets under the NEXT UTC date — without tomorrow in the window its
+# Matches row is never created in time and the bonus tab locks the whole evening.
 auto = po.poll_dates(TODAY)
-check("automated run polls two days", len(auto) == 2)
+check("automated run polls three days", len(auto) == 3)
 check("automated run includes yesterday", YESTERDAY in auto)
 check("automated run includes today", TODAY in auto)
-check("yesterday precedes today (chronological)", auto == [YESTERDAY, TODAY])
+check("automated run includes tomorrow (bonus-bet row creation)", TOMORROW in auto)
+check("chronological order", auto == [YESTERDAY, TODAY, TOMORROW])
 
 # The actual bug: a 22:00 UTC June 13 kickoff is bucketed June 13. After midnight
 # the run executes on June 14 — June 13 must still be queried or FT is never seen.
@@ -43,7 +48,24 @@ check("--date for today polls only today", po.poll_dates(TODAY, target_date=TODA
 
 # ---- month boundary (timedelta, not naive arithmetic) -----------------------
 check("crosses month start correctly",
-      po.poll_dates(dt.date(2026, 7, 1)) == [dt.date(2026, 6, 30), dt.date(2026, 7, 1)])
+      po.poll_dates(dt.date(2026, 7, 1)) == [dt.date(2026, 6, 30), dt.date(2026, 7, 1), dt.date(2026, 7, 2)])
+check("crosses month end correctly",
+      po.poll_dates(dt.date(2026, 6, 30)) == [dt.date(2026, 6, 29), dt.date(2026, 6, 30), dt.date(2026, 7, 1)])
+
+# ---- to_match_fields: KO fixture published before pairings (null teams) -------
+# The daily season-schedule refresh and the tomorrow poll can both see fixtures
+# whose teams aren't decided yet — must not crash, label falls back to "? v ?".
+tbd = {"fixture": {"id": 999001, "date": "2026-07-11T20:00:00+00:00",
+                   "status": {"short": "NS"}, "venue": {}},
+       "league": {"round": "Quarter-finals"},
+       "teams": {"home": None, "away": None}, "goals": {}}
+rec = po.to_match_fields(tbd, {}, "2026-07-05T00:00:00Z")
+check("TBD fixture doesn't crash, keeps id", rec["fixture_id"] == 999001)
+check("TBD fixture label falls back", rec["label"] == "? v ?")
+check("TBD fixture stays Scheduled", rec["status"] == "Scheduled")
+check("TBD fixture links no teams", "home_team" not in rec and "away_team" not in rec)
+tbd2 = dict(tbd); tbd2["teams"] = {"home": {"id": None, "name": None}, "away": {"id": None, "name": None}}
+check("null-name team objects also fall back", po.to_match_fields(tbd2, {}, "x")["label"] == "? v ?")
 
 # ---- should_fetch_events: capture final-minutes goals on Live→Finished -------
 sfe = po.should_fetch_events
