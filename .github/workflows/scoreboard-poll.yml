@@ -19,7 +19,11 @@ concurrency:
 jobs:
   poll:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    # 8 min: above the real worst-case run (~6 min during busy live matches),
+    # but well under GitHub's ~15-min runner-acquisition limbo. If a hosted
+    # runner is never acquired, the job fails fast instead of dragging to 15 min
+    # and overlapping the next scheduled poll.
+    timeout-minutes: 8
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6

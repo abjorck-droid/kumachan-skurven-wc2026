@@ -16,6 +16,8 @@ concurrency:
 jobs:
   poll:
     runs-on: ubuntu-latest
+    # 5 min is plenty for the single daily poller step, and stays well under
+    # GitHub's ~15-min runner-acquisition limbo so a dropped runner fails fast.
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v5
