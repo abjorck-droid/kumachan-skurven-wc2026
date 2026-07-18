@@ -37,6 +37,11 @@ const WILD_TYPES = ["Extra time played", "Decided on penalties", "Own goal in ma
   "5+ combined cards", "Hat-trick in match", "Keeper saves penalty", "VAR overturn"];
 const STOPPAGE_TOKEN = "Stoppage2x";                     // one per player, pot rows only
 const DUEL_VALUES = ["Messi", "Mbappé", "Level"];
+// Rare-event wild bets are YES-ONLY: a flat payout on a <25% event makes "No" nearly
+// free points (worse under ×2). Agreed 2026-07-17. KEEP IN SYNC with the same list in
+// site/index.html and site/live.html (test_api_savebonus_stoppage cross-checks all three).
+const YES_ONLY_TYPES = new Set(["Hat-trick in match", "Keeper saves penalty",
+  "Own goal in match", "No second-half goals", "Decided on penalties"]);
 // Mulligan (spec 03 §The Mulligan, v1.1): one per player, used before R32. The 2026 schedule has
 // NO gap (last group games June 28, R32 starts June 29), so the window opens during the final group
 // matchday. Inclusive UTC dates — MUST stay in sync with scripts/pickentry_server.MULLIGAN_WINDOW.
@@ -625,6 +630,8 @@ async function saveBonus(env, prow, picks) {
       const okTypes = stop ? BONUS_TYPES.concat(WILD_TYPES) : BONUS_TYPES;
       if (!okTypes.includes(p.bet_type)) throw httpErr(`bad bet type '${p.bet_type}'`, 400);
       if (p.bet_value !== "Yes" && p.bet_value !== "No") throw httpErr(`bad bet value '${p.bet_value}'`, 400);
+      if (YES_ONLY_TYPES.has(p.bet_type) && p.bet_value !== "Yes")
+        throw httpErr(`'${p.bet_type}' is a yes-only bet — betting against a rare event is free points`, 400);
       pick = { key: p.key, type: stop ? "stoppage_bet" : "bonus_bet", match_id: fid,
         bet_type: p.bet_type, bet_value: p.bet_value, stoppage: stop };
     } else if ((m = /^stoppage\|(\d+)\|(outcome|exact)$/.exec(p.key))) {

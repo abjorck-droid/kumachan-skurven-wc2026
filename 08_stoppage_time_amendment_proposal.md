@@ -78,18 +78,24 @@ and dropping it removes the degenerate "clinch by abstention" line the current r
 
 ### Wild menu (these two fixtures only)
 
-| Bet | Value | Resolution |
-|---|---|---|
-| Extra time played | **15** | auto |
-| Decided on penalties | **25** | auto |
-| Own goal in match | **25** | auto |
-| Substitute scores | **15** | auto (lineups + events) |
-| Goal in 90'+ stoppage time (either half) | **20** | auto (`minute.extra`) |
-| No second-half goals | **25** | auto |
-| 5+ combined cards | **15** | auto |
-| Hat-trick by any player | **40** | auto |
-| Keeper saves a penalty (in regulation) | **30** | judged — API "Missed Penalty" doesn't distinguish saved from off-target |
-| VAR overturns a decision | **20** | judged — API VAR events are patchy |
+*Amended 2026-07-17 (agreed): rare-event bets are **yes-only** — a flat payout on a <25%
+event makes "No" nearly free points, and the Stoppage ×2 compounds it. You can back a rare
+event; you can't fade one. VAR keeps its No side deliberately: same asymmetry grade as the
+classic Red card 20, which both players have bet (and won) all tournament. Extra time is a
+real yes/no on both fixtures — the 2026 regs give the 3rd-place game full extra time.*
+
+| Bet | Value | Sides | Resolution |
+|---|---|---|---|
+| Extra time played | **15** | Yes / No | auto |
+| Decided on penalties | **25** | **Yes only** | auto |
+| Own goal in match | **25** | **Yes only** | auto |
+| Substitute scores | **15** | Yes / No | auto (lineups + events) |
+| Goal in 90'+ stoppage time (either half) | **20** | Yes / No | auto (`minute.extra`) |
+| No second-half goals | **25** | **Yes only** | auto |
+| 5+ combined cards | **15** | Yes / No | auto |
+| Hat-trick by any player | **40** | **Yes only** | auto |
+| Keeper saves a penalty (in regulation) | **30** | **Yes only** | judged — API "Missed Penalty" doesn't distinguish saved from off-target |
+| VAR overturns a decision | **20** | Yes / No | judged — API VAR events are patchy |
 
 ### The Duel (cross-match special, one per player)
 

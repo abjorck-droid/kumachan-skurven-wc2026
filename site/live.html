@@ -445,6 +445,11 @@ function bonusLabel(p){
              "No second-half goals":"No 2H goals","5+ combined cards":"5+ cards",
              "Hat-trick in match":"Hat-trick","Keeper saves penalty":"Keeper pen save",
              "VAR overturn":"VAR"}[p.bet_type]||p.bet_type||"?";
+  // yes-only rare-event bets (agreed 2026-07-17; KEEP IN SYNC with index.html + route.js):
+  // the value is always Yes, so the suffix is noise
+  var yesOnly={"Hat-trick in match":1,"Keeper saves penalty":1,"Own goal in match":1,
+               "No second-half goals":1,"Decided on penalties":1};
+  if(yesOnly[p.bet_type]) return short;
   return short+" "+(p.bet_value||"?");
 }
 function bonusPicksFor(picks, fid){

@@ -192,6 +192,10 @@ const WILD_TYPES = [
   ["VAR overturn","VAR overturn · 20","Yes","No"],
 ];
 const ALL_BET_TYPES = BONUS_TYPES.concat(WILD_TYPES);
+// Rare-event wild bets are YES-ONLY (agreed 2026-07-17): "No" on a <25% event is nearly
+// free points. KEEP IN SYNC with functions/api/[[route]].js and site/live.html.
+const YES_ONLY = new Set(["Hat-trick in match","Keeper saves penalty","Own goal in match",
+  "No second-half goals","Decided on penalties"]);
 const STOPPAGE_TOKEN_OPTS = [["","— no token —"],["Stoppage2x","Stoppage ×2"]];
 const DUEL_OPTS = ["Messi","Mbappé","Level"];
 const editableBet = (key)=>{ const m=META[key];
@@ -445,6 +449,8 @@ function numRow(key,label){ const v=(VALUES[key]||{}).scalar; const vv=(v===unde
 // --- bonus bets -------------------------------------------------------------
 function betValueOptions(betType, sel){
   const def = ALL_BET_TYPES.find(b=>b[0]===betType) || [null,null,"Yes","No"];
+  if(YES_ONLY.has(betType))   // rare-event bets: you can back it, never fade it
+    return `<option value="Yes" selected>${def[2]}</option>`;
   return `<option value="">— ? —</option>`+
     `<option value="Yes" ${sel==="Yes"?'selected':''}>${def[2]}</option>`+
     `<option value="No" ${sel==="No"?'selected':''}>${def[3]}</option>`;
@@ -976,6 +982,7 @@ function onChange(e){
   else if(role==="scalar"){ VALUES[key].scalar = e.target.value===""?undefined:Number(e.target.value); }
   else if(role==="bet_type"){
     VALUES[key].bet_type = e.target.value || undefined;
+    if(YES_ONLY.has(VALUES[key].bet_type)) VALUES[key].bet_value = "Yes";   // only legal value
     const vs = document.querySelector(`select[data-role="bet_value"][data-key="${CSS.escape(key)}"]`);
     if(vs) vs.innerHTML = betValueOptions(VALUES[key].bet_type, VALUES[key].bet_value);
   }
@@ -1039,6 +1046,9 @@ function collectBonusPicks(){
     const p={key, match_id:m.match_id};
     if(key.startsWith("bonus|")){                       // classic slots (+ pot slot 3)
       if(!v.bet_type || !v.bet_value) return null;      // a bet needs both halves
+      // stale "No" on a now-yes-only type: treat as incomplete rather than poison the
+      // whole autosave payload with a 400 — the server then deletes the cleared row
+      if(YES_ONLY.has(v.bet_type) && v.bet_value!=="Yes") return null;
       p.bet_type=v.bet_type; p.bet_value=v.bet_value;
     } else if(/\|outcome$/.test(key)){                  // stoppage: advancing team
       if(!v.team_id) return null;

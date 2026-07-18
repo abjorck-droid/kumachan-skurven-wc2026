@@ -121,6 +121,34 @@ const rowByLabel = (store, lbl) => store.tables.Predictions.find((r) => r.fields
   check("non-integer exact score rejected", r.status === 400);
 }
 
+// ---- yes-only rare-event bets (agreed 2026-07-17) --------------------------
+{
+  const store = makeStore();
+  for (const t of ["Hat-trick in match", "Keeper saves penalty", "Own goal in match",
+                   "No second-half goals", "Decided on penalties"]) {
+    const r = await savebonus(store, [{ key: `bonus|${FID_FINAL}|1`, bet_type: t, bet_value: "No" }]);
+    check(`'${t}' No rejected (yes-only)`, r.status === 400 && /yes-only/.test(r.body.error || ""));
+  }
+  let r = await savebonus(store, [{ key: `bonus|${FID_FINAL}|1`, bet_type: "Hat-trick in match", bet_value: "Yes" }]);
+  check("yes-only bet accepted with Yes", r.status === 200);
+  r = await savebonus(store, [{ key: `bonus|${FID_FINAL}|1`, bet_type: "VAR overturn", bet_value: "No" }]);
+  check("VAR overturn keeps its No side (red-card-grade asymmetry)", r.status === 200);
+
+  // the three YES_ONLY copies (route.js / index.html / live.html) must never drift
+  const { readFileSync } = await import("node:fs");
+  const dir = new URL("..", import.meta.url);
+  const extract = (src) => {
+    const m = /YES_ONLY(?:_TYPES)?\s*=\s*new Set\(\[([\s\S]*?)\]\)/.exec(src) ||
+              /var yesOnly=\{([\s\S]*?)\}/.exec(src);
+    return [...m[1].matchAll(/"([^"]+)"/g)].map((x) => x[1]).sort().join("|");
+  };
+  const route = extract(readFileSync(new URL("functions/api/%5B%5Broute%5D%5D.js", dir), "utf8"));
+  const entry = extract(readFileSync(new URL("site/index.html", dir), "utf8"));
+  const live  = extract(readFileSync(new URL("site/live.html", dir), "utf8"));
+  check("YES_ONLY list identical in route.js / index.html / live.html",
+    route.length > 0 && route === entry && route === live);
+}
+
 // ---- token rules -----------------------------------------------------------
 {
   const store = makeStore();

@@ -225,7 +225,12 @@ check("softColor: .ttag.both gradient uses the CSS vars", /\.ttag\.both\{backgro
   check("pot: outcome label resolves the team code", T.stoppageLabel(picks[0], tb) === "Winner ESP");
   check("pot: exact label", T.stoppageLabel(picks[1], tb) === "Exact 2–1");
   check("pot: Duel label", T.stoppageLabel(picks[2], tb) === "Duel Mbappé");
-  check("pot: wild bet short label", T.stoppageLabel(picks[3], tb) === "Hat-trick Yes");
+  check("pot: yes-only wild bet renders without the redundant value",
+        T.stoppageLabel(picks[3], tb) === "Hat-trick" &&
+        T.bonusLabel({ bet_type: "Decided on penalties", bet_value: "Yes" }) === "Pens");
+  check("pot: two-sided wild bet keeps its value suffix",
+        T.bonusLabel({ bet_type: "VAR overturn", bet_value: "No" }) === "VAR No" &&
+        T.bonusLabel({ bet_type: "Extra time played", bet_value: "Yes" }) === "ET Yes");
   check("pot: classic short labels intact", T.bonusLabel({ bet_type: "VAR overturn", bet_value: "No" }) === "VAR No" &&
         T.bonusLabel({ bet_type: "BTTS", bet_value: "Yes" }) === "BTTS Yes");
   check("pot: header renders stoppage_pot + ×2-in-hand tag",
