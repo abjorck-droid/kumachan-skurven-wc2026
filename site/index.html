@@ -173,6 +173,29 @@ const BONUS_TYPES = [
   ["Both teams score 2+","Both score 2+ · 15","Yes","No"],
   ["Goal in first 15 min","Goal in first 15′ · 15","Yes","No"],
 ];
+// v1.2 "Stoppage Time" pot (docs 08/09): the last two fixtures get outcome/exact betting,
+// a third bonus slot, this wild menu, the Duel, and one pot-only ×2 token. Everything
+// scores into the ring-fenced pot (margin adjustment), never the main game.
+const STOPPAGE_FIXTURES = [1591865, 1591866];         // 3rd Place Final, Final
+const STOPPAGE_DUEL_ANCHOR = 1591865;                 // Duel locks with the 3rd-place kickoff
+const isStoppage = (fid) => STOPPAGE_FIXTURES.includes(Number(fid));
+const WILD_TYPES = [
+  ["Extra time played","Extra time · 15","Yes","No"],
+  ["Decided on penalties","Penalties decide it · 25","Yes","No"],
+  ["Own goal in match","Own goal · 25","Yes","No"],
+  ["Substitute scores","Sub scores · 15","Yes","No"],
+  ["Goal in 90+ stoppage time","90′+ stoppage goal · 20","Yes","No"],
+  ["No second-half goals","No 2nd-half goals · 25","Yes","No"],
+  ["5+ combined cards","5+ cards · 15","Yes","No"],
+  ["Hat-trick in match","Hat-trick · 40","Yes","No"],
+  ["Keeper saves penalty","Keeper saves pen · 30","Yes","No"],
+  ["VAR overturn","VAR overturn · 20","Yes","No"],
+];
+const ALL_BET_TYPES = BONUS_TYPES.concat(WILD_TYPES);
+const STOPPAGE_TOKEN_OPTS = [["","— no token —"],["Stoppage2x","Stoppage ×2"]];
+const DUEL_OPTS = ["Messi","Mbappé","Level"];
+const editableBet = (key)=>{ const m=META[key];
+  return !!m && (m.type==="bonus_bet"||m.type==="stoppage_bet") && !m.started; };
 function matchStarted(m){
   if(m.status && m.status!=="Scheduled") return true;
   return !!(m.kickoff && new Date(m.kickoff) <= new Date());
@@ -345,10 +368,11 @@ function teamOptions(sel, dhOnly){
   });
   return h + '</optgroup>';
 }
-function tokenSelect(key){
+function tokenSelect(key, stoppage){
   const v = (VALUES[key]||{}).token || "";
+  const opts = stoppage ? STOPPAGE_TOKEN_OPTS : TOKEN_OPTS;   // pot rows take only Stoppage ×2
   return `<select data-key="${key}" data-role="token">` +
-    TOKEN_OPTS.map(([val,lab])=>`<option value="${val}" ${val===v?'selected':''}>${lab}</option>`).join('') + `</select>`;
+    opts.map(([val,lab])=>`<option value="${val}" ${val===v?'selected':''}>${lab}</option>`).join('') + `</select>`;
 }
 function noteInput(key){
   const v = (VALUES[key]||{}).note || "";
@@ -420,32 +444,78 @@ function numRow(key,label){ const v=(VALUES[key]||{}).scalar; const vv=(v===unde
 
 // --- bonus bets -------------------------------------------------------------
 function betValueOptions(betType, sel){
-  const def = BONUS_TYPES.find(b=>b[0]===betType) || [null,null,"Yes","No"];
+  const def = ALL_BET_TYPES.find(b=>b[0]===betType) || [null,null,"Yes","No"];
   return `<option value="">— ? —</option>`+
     `<option value="Yes" ${sel==="Yes"?'selected':''}>${def[2]}</option>`+
     `<option value="No" ${sel==="No"?'selected':''}>${def[3]}</option>`;
 }
 function bonusSlotRow(m, slot){
+  const stop=isStoppage(m.fixture_id);
   const key="bonus|"+m.fixture_id+"|"+slot;
-  META[key]={type:"bonus_bet", match_id:m.fixture_id, started:matchStarted(m)};
+  META[key]={type:stop?"stoppage_bet":"bonus_bet", match_id:m.fixture_id, started:matchStarted(m)};
   const v=VALUES[key]||{};
   const hn=m.home_code||m.home_name||"Home", an=m.away_code||m.away_name||"Away";
-  const lab = slot===1 ? `${hn} v ${an}` : "+ second bet";
+  const lab = slot===1 ? `${hn} v ${an}` : slot===2 ? "+ second bet" : "+ third bet (pot)";
+  const menu = stop ? ALL_BET_TYPES : BONUS_TYPES;   // wild types are stoppage-pot only
   const typeSel=`<select data-key="${key}" data-role="bet_type"><option value="">— bet type —</option>`+
-    BONUS_TYPES.map(([val,txt])=>`<option value="${val}" ${v.bet_type===val?'selected':''}>${txt}</option>`).join('')+`</select>`;
+    menu.map(([val,txt])=>`<option value="${val}" ${v.bet_type===val?'selected':''}>${txt}</option>`).join('')+`</select>`;
   const valSel=`<select data-key="${key}" data-role="bet_value">${betValueOptions(v.bet_type, v.bet_value)}</select>`;
   const tokened=v.token?' tokened':'';
   const saveTag=`<span class="bsave" id="bsave-${key}"></span>`;
   return `<div class="row mrow${tokened}" id="row-${key}">
     <span class="lab">${lab}</span>
     <div class="mctl">${typeSel}${valSel}${saveTag}</div>
-    ${tokenSelect(key)}
+    ${tokenSelect(key, stop)}
     ${noteInput(key)}
   </div>`;
 }
 function bonusBetLabel(v){
-  const def=BONUS_TYPES.find(b=>b[0]===v.bet_type); if(!def) return "";
+  const def=ALL_BET_TYPES.find(b=>b[0]===v.bet_type); if(!def) return "";
   return def[1].split(" · ")[0]+": "+(v.bet_value==="Yes"?def[2]:def[3]);
+}
+// --- v1.2 stoppage-pot rows (outcome / exact / Duel) -------------------------
+function stoppageOutcomeRow(m){
+  const key="stoppage|"+m.fixture_id+"|outcome";
+  META[key]={type:"stoppage_bet", match_id:m.fixture_id, started:matchStarted(m)};
+  const v=VALUES[key]||{};
+  const pts = m.fixture_id===STOPPAGE_DUEL_ANCHOR ? "20" : "50";
+  const opts=[["","— winner —"],[String(m.home_id),m.home_code||m.home_name],[String(m.away_id),m.away_code||m.away_name]]
+    .map(([val,lab])=>`<option value="${val}" ${String(v.team_id||"")===val&&val!==""?'selected':''}>${lab}</option>`).join('');
+  const saveTag=`<span class="bsave" id="bsave-${key}"></span>`;
+  return `<div class="row mrow${v.token?' tokened':''}" id="row-${key}">
+    <span class="lab">Winner (advances) · ${pts}</span>
+    <div class="mctl"><select data-key="${key}" data-role="team">${opts}</select>${saveTag}</div>
+    ${tokenSelect(key, true)}
+    ${noteInput(key)}
+  </div>`;
+}
+function stoppageExactRow(m){
+  const key="stoppage|"+m.fixture_id+"|exact";
+  META[key]={type:"stoppage_bet", match_id:m.fixture_id, started:matchStarted(m)};
+  const v=VALUES[key]||{};
+  const pts = m.fixture_id===STOPPAGE_DUEL_ANCHOR ? "+15" : "+30";
+  const num=(role,val)=>`<input type="number" min="0" max="19" data-key="${key}" data-role="${role}" value="${val==null?"":val}" style="width:3.2em">`;
+  const saveTag=`<span class="bsave" id="bsave-${key}"></span>`;
+  return `<div class="row mrow${v.token?' tokened':''}" id="row-${key}">
+    <span class="lab">Exact after 90′ · ${pts}</span>
+    <div class="mctl">${num("score_home",v.score_home)} – ${num("score_away",v.score_away)}${saveTag}</div>
+    ${tokenSelect(key, true)}
+    ${noteInput(key)}
+  </div>`;
+}
+function stoppageDuelRow(m){
+  const key="stoppage|duel";
+  META[key]={type:"stoppage_bet", match_id:STOPPAGE_DUEL_ANCHOR, started:matchStarted(m)};
+  const v=VALUES[key]||{};
+  const opts=[["","— pick —"]].concat(DUEL_OPTS.map(o=>[o,o]))
+    .map(([val,lab])=>`<option value="${val}" ${v.player_text===val&&val!==""?'selected':''}>${lab}</option>`).join('');
+  const saveTag=`<span class="bsave" id="bsave-${key}"></span>`;
+  return `<div class="row mrow${v.token?' tokened':''}" id="row-${key}">
+    <span class="lab">The Duel — Messi v Mbappé, goals across both games · 25</span>
+    <div class="mctl"><select data-key="${key}" data-role="text">${opts}</select>${saveTag}</div>
+    ${tokenSelect(key, true)}
+    ${noteInput(key)}
+  </div>`;
 }
 function localDayKey(iso){
   // Viewer-LOCAL calendar date for grouping — slicing the ISO string groups by
@@ -626,19 +696,42 @@ function render(){
       const d=localDayKey(m.kickoff);
       if(d!==day){ day=d; bn+=`<div class="grp-label">${kickLabel(m.kickoff).split(" · ")[0]} <span style="color:var(--text-mute)">· ${d}</span></div>`; }
       bn += `<div class="sub" style="margin:6px 0 4px">${m.home_name||m.home_code||"?"} v ${m.away_name||m.away_code||"?"} · ${kickLabel(m.kickoff).split(" · ")[1]||""}${m.round&&!String(m.round).toLowerCase().startsWith("group")?" · "+m.round:""}</div>`;
-      bn += bonusSlotRow(m,1) + bonusSlotRow(m,2);
+      if(isStoppage(m.fixture_id)){
+        // v1.2 stoppage pot: outcome + exact + 3 bet slots (+ the Duel on the 3rd-place card).
+        // Everything here is ring-fenced — it adjusts the recorded margin, never the winner.
+        bn += `<div class="sub" style="margin:2px 0 4px"><b>Stoppage pot</b> — ring-fenced from the
+          main game (margin only, can't flip the winner). No co-participation rule; wild bet types
+          unlocked; one Stoppage ×2 token for the whole pot.</div>`;
+        bn += stoppageOutcomeRow(m) + stoppageExactRow(m);
+        bn += bonusSlotRow(m,1) + bonusSlotRow(m,2) + bonusSlotRow(m,3);
+        if(m.fixture_id===STOPPAGE_DUEL_ANCHOR) bn += stoppageDuelRow(m);
+      } else {
+        bn += bonusSlotRow(m,1) + bonusSlotRow(m,2);
+      }
     });
   } else {
     bn += `<div class="sub">No upcoming matches to bet on${(DATA.matches||[]).length?" — everything has kicked off":" (fixtures not loaded yet)"}.</div>`;
   }
   // already-started matches where this player had bets — read-only recap
+  const stopRecap = (m)=>{
+    const parts=[];
+    const oc=VALUES["stoppage|"+m.fixture_id+"|outcome"]||{};
+    if(oc.team_id!=null){ const t=(DATA.teams||[]).find(t=>String(t.id)===String(oc.team_id));
+      parts.push("Winner: "+((t&&(t.code||t.name))||oc.team_id)+(oc.token?" · "+oc.token:"")); }
+    const ex=VALUES["stoppage|"+m.fixture_id+"|exact"]||{};
+    if(ex.score_home!=null&&ex.score_home!=="") parts.push("Exact: "+ex.score_home+"–"+ex.score_away+(ex.token?" · "+ex.token:""));
+    if(m.fixture_id===STOPPAGE_DUEL_ANCHOR){ const d=VALUES["stoppage|duel"]||{};
+      if(d.player_text) parts.push("Duel: "+d.player_text+(d.token?" · "+d.token:"")); }
+    return parts;
+  };
   const startedBets = (DATA.matches||[]).filter(m=>matchStarted(m) &&
-    ((VALUES["bonus|"+m.fixture_id+"|1"]||{}).bet_type || (VALUES["bonus|"+m.fixture_id+"|2"]||{}).bet_type));
+    ([1,2,3].some(s=>(VALUES["bonus|"+m.fixture_id+"|"+s]||{}).bet_type) || stopRecap(m).length));
   if(startedBets.length){
     bn += `<div class="grp-label">Locked — kicked off</div>`;
     startedBets.forEach(m=>{
-      const parts=[1,2].map(s=>VALUES["bonus|"+m.fixture_id+"|"+s]||{}).filter(v=>v.bet_type)
-        .map(v=>bonusBetLabel(v)+(v.token?" · "+v.token:""));
+      const parts=stopRecap(m).concat(
+        [1,2,3].map(s=>VALUES["bonus|"+m.fixture_id+"|"+s]||{}).filter(v=>v.bet_type)
+          .map(v=>bonusBetLabel(v)+(v.token?" · "+v.token:"")));
       bn += `<div class="sub" style="margin:4px 0">${m.home_code||"?"} v ${m.away_code||"?"} — ${parts.join("  ·  ")}</div>`;
     });
   }
@@ -871,8 +964,8 @@ function updateSummary(){
 function onChange(e){
   const key=e.target.dataset.key, role=e.target.dataset.role; if(!key) return;
   // After the main lock, the bonus tab stays live (setLockedUI leaves it enabled) —
-  // accept edits ONLY for bonus-bet keys on matches that haven't kicked off.
-  if(LOCKED && !(key.startsWith("bonus|") && META[key] && META[key].type==="bonus_bet" && !META[key].started)) return;
+  // accept edits ONLY for bet rows (classic bonus + v1.2 stoppage pot) not yet kicked off.
+  if(LOCKED && !editableBet(key)) return;
   VALUES[key] = VALUES[key] || {};
   if(role==="team"){ VALUES[key].team_id = e.target.value || undefined; }   // bracket slots are tree-generated now; this only serves Dark Horse
   else if(role==="player"){ VALUES[key].player_id = e.target.value || undefined; }
@@ -898,11 +991,17 @@ function onChange(e){
       const L={Double:"Double",Triple:"Triple",AllIn:"All-In"};
       flash("No "+(L[attempted]||attempted)+" tokens left");
     }
+    // v1.2: the Stoppage ×2 has its own budget of one, across the whole pot
+    if(attempted==="Stoppage2x" &&
+       Object.values(VALUES).filter(v=>v.token==="Stoppage2x").length>1){
+      VALUES[key].token = prev||undefined; e.target.value = prev;
+      flash("Stoppage ×2 already placed — clear it there first");
+    }
     document.getElementById("row-"+key).classList.toggle("tokened", !!VALUES[key].token);
     updateReserves();
   }
-  // Autosave editable bonus-bet rows (type/value/token/note) — same lock rule as the guard above
-  if(key.startsWith("bonus|") && META[key] && META[key].type==="bonus_bet" && !META[key].started){
+  // Autosave editable bet rows (classic + stoppage; type/value/token/note/scores/teams)
+  if(editableBet(key)){
     markBonusDirty(key); scheduleBonusAutosave();
   }
   updateSummary();
@@ -911,8 +1010,9 @@ function flash(msg){ const s=$("#status"); s.textContent="⚠ "+msg; s.style.col
   setTimeout(()=>{ s.textContent=""; s.style.color=""; },2200); }
 
 function collectPicks(){
-  // bonus bets have their own save path (/api/savebonus) and their own lock rhythm
-  return Object.keys(META).filter(key=>META[key].type!=="bonus_bet").map(key=>{
+  // bet rows (classic bonus + v1.2 stoppage pot) have their own save path
+  // (/api/savebonus) and their own lock rhythm — keep them out of the main save
+  return Object.keys(META).filter(key=>META[key].type!=="bonus_bet"&&META[key].type!=="stoppage_bet").map(key=>{
     const v=VALUES[key]||{}; const m=META[key];
     const has = v.team_id||v.player_id||v.player_text||v.outcome||(v.score_home!=null&&v.score_home!=="")||(v.scalar!==undefined&&v.scalar!=="")||v.token||v.note;
     if(!has) return null;
@@ -934,13 +1034,22 @@ function collectPicks(){
 }
 
 function collectBonusPicks(){
-  return Object.keys(META).filter(key=>{
-    const m=META[key];
-    return m.type==="bonus_bet" && !m.started;        // started matches are immutable
-  }).map(key=>{
+  return Object.keys(META).filter(key=>editableBet(key)).map(key=>{   // started rows are immutable
     const v=VALUES[key]||{}; const m=META[key];
-    if(!v.bet_type || !v.bet_value) return null;       // a bet needs both halves
-    const p={key, type:"bonus_bet", match_id:m.match_id, bet_type:v.bet_type, bet_value:v.bet_value};
+    const p={key, match_id:m.match_id};
+    if(key.startsWith("bonus|")){                       // classic slots (+ pot slot 3)
+      if(!v.bet_type || !v.bet_value) return null;      // a bet needs both halves
+      p.bet_type=v.bet_type; p.bet_value=v.bet_value;
+    } else if(/\|outcome$/.test(key)){                  // stoppage: advancing team
+      if(!v.team_id) return null;
+      p.team_id=v.team_id;
+    } else if(/\|exact$/.test(key)){                    // stoppage: score after 90'
+      if(v.score_home==null||v.score_home===""||v.score_away==null||v.score_away==="") return null;
+      p.score_home=v.score_home; p.score_away=v.score_away;
+    } else if(key==="stoppage|duel"){                   // the Duel special
+      if(!v.player_text) return null;
+      p.player_text=v.player_text;
+    } else return null;
     if(v.token) p.token=v.token;
     if(v.note) p.pundit_note=v.note;
     return p;

@@ -24,6 +24,19 @@ const START_TOKENS = { Double: 4, Triple: 2, AllIn: 1 };
 // Per-match bonus-bet menu (spec §bonus bets, all binary Yes/No; "No" on Over 2.5 = Under).
 const BONUS_TYPES = ["BTTS", "Over 2.5 goals", "Penalty in match", "Red card in match",
   "Both teams score 2+", "Goal in first 15 min"];
+// v1.2 "Stoppage Time" pot (docs 08/09, adopted 2026-07-17): ALL betting on the last two
+// fixtures rides the savebonus flow (same sealed-until-kickoff lifecycle) but is ring-fenced —
+// rows are written prediction_type "stoppage_bet" + pot "stoppage". The scoring engine's type
+// dispatch skips unknown types, so total_score never sees pot rows; pot_points is scored
+// manually and tallied by scripts/setup_stoppage_pot.py. PRECONDITION: that script's schema
+// migration must run BEFORE this deploys (select options + stoppage_token_remaining field).
+const STOPPAGE_FIXTURES = new Set([1591865, 1591866]);   // 3rd Place Final, Final
+const STOPPAGE_DUEL_ANCHOR = 1591865;   // the Duel locks & reveals with the 3rd-place kickoff
+const WILD_TYPES = ["Extra time played", "Decided on penalties", "Own goal in match",
+  "Substitute scores", "Goal in 90+ stoppage time", "No second-half goals",
+  "5+ combined cards", "Hat-trick in match", "Keeper saves penalty", "VAR overturn"];
+const STOPPAGE_TOKEN = "Stoppage2x";                     // one per player, pot rows only
+const DUEL_VALUES = ["Messi", "Mbappé", "Level"];
 // Mulligan (spec 03 §The Mulligan, v1.1): one per player, used before R32. The 2026 schedule has
 // NO gap (last group games June 28, R32 starts June 29), so the window opens during the final group
 // matchday. Inclusive UTC dates — MUST stay in sync with scripts/pickentry_server.MULLIGAN_WINDOW.
@@ -119,6 +132,7 @@ function predictionFields(playerName, pick, teamMap, playerRec, sgMap, footMap, 
   if (pick.bet_value) rec.bonus_bet_value = pick.bet_value;
   if (pick.token) rec.confidence_token = pick.token;
   if (pick.pundit_note) rec.pundit_note = pick.pundit_note;
+  if (pick.pot) rec.pot = pick.pot;   // v1.2 stoppage-pot ring-fence marker
   return rec;
 }
 
@@ -382,6 +396,7 @@ async function bootstrap(env, prow) {
       Double: pf.tokens_remaining_double ?? 4,
       Triple: pf.tokens_remaining_triple ?? 2,
       AllIn: pf.tokens_remaining_allin ?? 1,
+      Stoppage: pf.stoppage_token_remaining ?? 1,   // v1.2 pot-only ×2 token
     },
   };
 }
@@ -591,58 +606,127 @@ async function saveBonus(env, prow, picks) {
   const started = (fid) =>
     (statusOf[fid] && statusOf[fid] !== "Scheduled") || (kickoffOf[fid] && kickoffOf[fid] <= now);
 
-  // validate + dedupe (last write wins per slot key)
+  // validate + dedupe (last write wins per slot key). Three key shapes:
+  //   bonus|{fid}|{1,2}        classic bonus slots (any fixture; wild types pot-only)
+  //   bonus|{fid}|3            third slot — stoppage-pot fixtures only (v1.2)
+  //   stoppage|{fid}|outcome   advancing team          (pot fixtures only)
+  //   stoppage|{fid}|exact     score after 90'         (pot fixtures only)
+  //   stoppage|duel            Messi/Mbappé/Level, anchored to the 3rd-place fixture
   const bySlot = {};
   for (const p of picks || []) {
     if (!p || !p.key) continue;
-    const m = /^bonus\|(\d+)\|([12])$/.exec(p.key);
-    if (!m) throw httpErr(`bad bonus key '${p.key}'`, 400);
-    const fid = parseInt(m[1]);
-    if (!matchMap[fid]) throw httpErr(`unknown match ${fid}`, 400);
-    if (started(fid)) throw httpErr(`match ${fid} has already kicked off — bonus bets are locked`, 400);
-    if (!BONUS_TYPES.includes(p.bet_type)) throw httpErr(`bad bet type '${p.bet_type}'`, 400);
-    if (p.bet_value !== "Yes" && p.bet_value !== "No") throw httpErr(`bad bet value '${p.bet_value}'`, 400);
-    bySlot[p.key] = { key: p.key, type: "bonus_bet", match_id: fid,
-      bet_type: p.bet_type, bet_value: p.bet_value, token: p.token || undefined,
-      pundit_note: p.pundit_note || undefined };
+    let pick = null, m;
+    if ((m = /^bonus\|(\d+)\|([123])$/.exec(p.key))) {
+      const fid = parseInt(m[1]);
+      if (!matchMap[fid]) throw httpErr(`unknown match ${fid}`, 400);
+      const stop = STOPPAGE_FIXTURES.has(fid);
+      if (m[2] === "3" && !stop) throw httpErr("third bonus slot is stoppage-pot only", 400);
+      if (started(fid)) throw httpErr(`match ${fid} has already kicked off — bets are locked`, 400);
+      const okTypes = stop ? BONUS_TYPES.concat(WILD_TYPES) : BONUS_TYPES;
+      if (!okTypes.includes(p.bet_type)) throw httpErr(`bad bet type '${p.bet_type}'`, 400);
+      if (p.bet_value !== "Yes" && p.bet_value !== "No") throw httpErr(`bad bet value '${p.bet_value}'`, 400);
+      pick = { key: p.key, type: stop ? "stoppage_bet" : "bonus_bet", match_id: fid,
+        bet_type: p.bet_type, bet_value: p.bet_value, stoppage: stop };
+    } else if ((m = /^stoppage\|(\d+)\|(outcome|exact)$/.exec(p.key))) {
+      const fid = parseInt(m[1]);
+      if (!STOPPAGE_FIXTURES.has(fid)) throw httpErr(`match ${fid} is not a stoppage-pot fixture`, 400);
+      if (!matchMap[fid]) throw httpErr(`unknown match ${fid}`, 400);
+      if (started(fid)) throw httpErr(`match ${fid} has already kicked off — bets are locked`, 400);
+      if (m[2] === "outcome") {
+        if (p.team_id == null || p.team_id === "") throw httpErr("outcome pick needs a team", 400);
+        pick = { key: p.key, type: "stoppage_bet", match_id: fid, team_id: p.team_id, stoppage: true };
+      } else {
+        const sh = p.score_home, sa = p.score_away;
+        if (!Number.isInteger(sh) || !Number.isInteger(sa) || sh < 0 || sa < 0)
+          throw httpErr("exact pick needs two whole scores", 400);
+        pick = { key: p.key, type: "stoppage_bet", match_id: fid,
+          score_home: sh, score_away: sa, stoppage: true };
+      }
+    } else if (p.key === "stoppage|duel") {
+      if (!matchMap[STOPPAGE_DUEL_ANCHOR]) throw httpErr("3rd-place fixture not loaded", 400);
+      if (started(STOPPAGE_DUEL_ANCHOR)) throw httpErr("the Duel locked at the 3rd-place kickoff", 400);
+      if (!DUEL_VALUES.includes(p.player_text))
+        throw httpErr(`Duel pick must be one of ${DUEL_VALUES.join(" / ")}`, 400);
+      pick = { key: p.key, type: "stoppage_bet", match_id: STOPPAGE_DUEL_ANCHOR,
+        side_game: "The Duel", player_text: p.player_text, stoppage: true };
+    } else {
+      throw httpErr(`bad bonus key '${p.key}'`, 400);
+    }
+    if (p.token) {
+      if (pick.stoppage && p.token !== STOPPAGE_TOKEN)
+        throw httpErr(`stoppage-pot rows take only the ${STOPPAGE_TOKEN} token`, 400);
+      if (!pick.stoppage && p.token === STOPPAGE_TOKEN)
+        throw httpErr(`${STOPPAGE_TOKEN} is stoppage-pot only`, 400);
+      pick.token = p.token;
+    }
+    if (p.pundit_note) pick.pundit_note = p.pundit_note;
+    if (pick.stoppage) pick.pot = "stoppage";
+    bySlot[p.key] = pick;
   }
   const newPicks = Object.values(bySlot);
 
-  // the player's existing bonus rows, split into replaceable (future) and immutable (started)
+  // the player's existing bet rows (classic + pot), split into replaceable (future) and
+  // immutable (started). Every stoppage row carries a match link (the Duel anchors to the
+  // 3rd-place fixture), so kickoff immutability covers the whole pot uniformly.
   const mine = (await atList(env, "Predictions", ["label", "prediction_type", "confidence_token", "match"]))
     .filter((r) => ((r.fields || {}).label || "").startsWith(playerName + "|"));
   const rec2fid = {};
   for (const [fid, rid] of Object.entries(matchMap)) rec2fid[rid] = parseInt(fid);
   const futureBonusRows = [], lockedTokens = { Double: 0, Triple: 0, AllIn: 0 };
+  let stoppageLockedTokens = 0;
   for (const r of mine) {
     const f = r.fields || {};
-    const isBonus = f.prediction_type === "bonus_bet";
-    const fid = isBonus ? rec2fid[(f.match || [])[0]] : null;
-    if (isBonus && fid != null && !started(fid)) { futureBonusRows.push(r); continue; }
+    const isBet = f.prediction_type === "bonus_bet" || f.prediction_type === "stoppage_bet";
+    const fid = isBet ? rec2fid[(f.match || [])[0]] : null;
+    if (isBet && fid != null && !started(fid)) { futureBonusRows.push(r); continue; }
     if (lockedTokens[f.confidence_token] != null) lockedTokens[f.confidence_token]++;  // immutable rows
+    if (f.confidence_token === STOPPAGE_TOKEN) stoppageLockedTokens++;
   }
 
-  // shared token budget across everything
+  // shared token budget across everything (Stoppage2x has its own budget of 1)
   const used = { ...lockedTokens };
   for (const p of newPicks) if (used[p.token] != null) used[p.token]++;
   for (const [t, max] of Object.entries(START_TOKENS))
     if (used[t] > max) throw httpErr(`token budget exceeded: ${used[t]}×${t} placed, ${max} available`, 400);
+  let stoppageUsed = stoppageLockedTokens;
+  for (const p of newPicks) if (p.token === STOPPAGE_TOKEN) stoppageUsed++;
+  if (stoppageUsed > 1)
+    throw httpErr(`token budget exceeded: ${stoppageUsed}×${STOPPAGE_TOKEN} placed, 1 available`, 400);
+
+  // resolve links needed by pot rows (outcome team, the Duel side game)
+  let teamMap = {}, sgMap = {};
+  if (newPicks.some((p) => p.team_id != null || p.side_game)) {
+    for (const r of await atList(env, "Teams", ["team_id"]))
+      if ((r.fields || {}).team_id != null) teamMap[parseInt(r.fields.team_id)] = r.id;
+    for (const r of await atList(env, "SideGames", ["name"])) sgMap[(r.fields || {}).name] = r.id;
+    for (const p of newPicks) {
+      if (p.team_id != null && !teamMap[parseInt(p.team_id)])
+        throw httpErr(`unknown team ${p.team_id}`, 400);
+      if (p.side_game && !sgMap[p.side_game])
+        throw httpErr(`side game '${p.side_game}' missing — run scripts/setup_stoppage_pot.py first`, 400);
+    }
+  }
 
   // delete cleared future slots, upsert the rest
   const keep = new Set(newPicks.map((p) => `${playerName}|${p.key}`));
   const doomed = futureBonusRows.filter((r) => !keep.has((r.fields || {}).label)).map((r) => r.id);
   const deleted = doomed.length ? await atDelete(env, "Predictions", doomed) : 0;
-  const records = newPicks.map((p) => predictionFields(playerName, p, {}, playerRec, {}, {}, matchMap));
+  const records = newPicks.map((p) => predictionFields(playerName, p, teamMap, playerRec, sgMap, {}, matchMap));
   const saved = records.length ? await atUpsert(env, "Predictions", records, ["label"]) : 0;
 
+  const poolFields = {
+    tokens_remaining_double: START_TOKENS.Double - used.Double,
+    tokens_remaining_triple: START_TOKENS.Triple - used.Triple,
+    tokens_remaining_allin: START_TOKENS.AllIn - used.AllIn,
+  };
+  // only touch the v1.2 field when the save involves the pot — keeps pre-migration
+  // classic saves from tripping over a not-yet-created Airtable field
+  if (newPicks.some((p) => p.stoppage) || stoppageUsed > 0)
+    poolFields.stoppage_token_remaining = 1 - stoppageUsed;
   await atReq(env, "PATCH", `${env.AIRTABLE_BASE_ID}/PoolPlayers`, {
-    records: [{ id: playerRec, fields: {
-      tokens_remaining_double: START_TOKENS.Double - used.Double,
-      tokens_remaining_triple: START_TOKENS.Triple - used.Triple,
-      tokens_remaining_allin: START_TOKENS.AllIn - used.AllIn,
-    } }],
+    records: [{ id: playerRec, fields: poolFields }],
   });
-  return { saved, deleted, tokensUsed: used };
+  return { saved, deleted, tokensUsed: used, stoppageTokensUsed: stoppageUsed };
 }
 
 async function lock(env, prow) {
@@ -815,7 +899,9 @@ async function publicView(env) {
     if (!owner || !lockedAt[owner]) continue;           // unlocked players stay hidden
     // Bonus bets stay sealed until their match kicks off — even for locked players
     // (spec: "hidden until kickoff"; the blind co-participation game depends on it).
-    if (f.prediction_type === "bonus_bet") {
+    // v1.2: stoppage-pot rows seal identically — every pot row carries a match link
+    // (the Duel anchors to the 3rd-place fixture), so kickoff reveal covers them all.
+    if (f.prediction_type === "bonus_bet" || f.prediction_type === "stoppage_bet") {
       const bfid = (f.match || []).length ? matchByRec[f.match[0]] : null;
       if (bfid == null || !startedFids.has(bfid)) continue;
     }
@@ -836,6 +922,8 @@ async function publicView(env) {
       bet_type: f.bonus_bet_type || null,
       bet_value: f.bonus_bet_value || null,
       token: f.confidence_token || null,
+      pot: f.pot || null,                                      // "stoppage" = ring-fenced (v1.2)
+      pot_points: f.pot_points ?? null,
       points: f.points_awarded ?? null,
       rival_bonus: f.beat_rival_bonus ?? null,
       resolved: !!f.resolved,
@@ -850,6 +938,8 @@ async function publicView(env) {
     return {
       name: f.name, color: f.display_color || null,
       total_score: f.total_score ?? 0,
+      stoppage_pot: f.stoppage_pot ?? 0,                       // v1.2 ring-fenced pot
+      stoppage_token: f.stoppage_token_remaining ?? null,
       tokens: { Double: f.tokens_remaining_double ?? null, Triple: f.tokens_remaining_triple ?? null,
         AllIn: f.tokens_remaining_allin ?? null },
       mulligans: f.mulligans_remaining ?? null,
