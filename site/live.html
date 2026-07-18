@@ -35,6 +35,7 @@
   .h2h .col.c1 .score{color:var(--p1)} .h2h .col.c2 .score{color:var(--p2)}
   .h2h .meta{font-family:'Antonio',sans-serif;font-size:10.5px;letter-spacing:.1em;color:var(--gold);
     text-transform:uppercase;margin-top:7px;font-weight:500}
+  .h2h .meta.pot{color:var(--accent)}   /* v1.2 stoppage pot — ring-fenced, accent-coded */
   .h2h .lockst{font-size:10px;letter-spacing:.12em;margin-top:4px;font-family:'Antonio',sans-serif;text-transform:uppercase}
   .h2h .lockst.yes{color:var(--gold)} .h2h .lockst.no{color:var(--text-mute)}
   .h2h .streak{font-family:'Antonio',sans-serif;font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;margin-top:3px}
@@ -437,11 +438,36 @@ function categoryTotals(D){
 function bonusLabel(p){
   if(p.bet_type==="Over 2.5 goals") return p.bet_value==="Yes"?"Over 2.5":"Under 2.5";
   var short={"BTTS":"BTTS","Penalty in match":"Pen","Red card in match":"Red",
-             "Both teams score 2+":"2+ each","Goal in first 15 min":"Goal<15’"}[p.bet_type]||p.bet_type||"?";
+             "Both teams score 2+":"2+ each","Goal in first 15 min":"Goal<15’",
+             // v1.2 stoppage-pot wild menu
+             "Extra time played":"ET","Decided on penalties":"Pens","Own goal in match":"OG",
+             "Substitute scores":"Sub scores","Goal in 90+ stoppage time":"90′+ goal",
+             "No second-half goals":"No 2H goals","5+ combined cards":"5+ cards",
+             "Hat-trick in match":"Hat-trick","Keeper saves penalty":"Keeper pen save",
+             "VAR overturn":"VAR"}[p.bet_type]||p.bet_type||"?";
   return short+" "+(p.bet_value||"?");
 }
 function bonusPicksFor(picks, fid){
   return (picks||[]).filter(function(p){ return p.type==="bonus_bet" && p.match_id===fid; });
+}
+// ---- v1.2 stoppage pot (docs 08/09): ring-fenced betting on the last two fixtures.
+// Rows arrive as type "stoppage_bet" (sealed until kickoff server-side); scored manually
+// in pot_points; the pot adjusts the recorded MARGIN, never the winner — so it renders
+// as its own strip and never joins the category totals.
+var STOPPAGE_FIXTURES=[1591865,1591866];        // 3rd Place Final, Final
+function isStoppageFixture(fid){ return STOPPAGE_FIXTURES.indexOf(Number(fid))>=0; }
+function stopPicksFor(picks, fid){
+  return (picks||[]).filter(function(p){ return p.type==="stoppage_bet" && p.match_id===fid; });
+}
+function stoppageLabel(p, teamById){
+  var k=p.key||"";
+  if(/\|outcome$/.test(k)){
+    var t=(p.team_id!=null&&teamById&&teamById[p.team_id])?(teamById[p.team_id].code||teamById[p.team_id].name):"?";
+    return "Winner "+t;
+  }
+  if(/\|exact$/.test(k)) return "Exact "+(p.score_home!=null?p.score_home:"?")+"–"+(p.score_away!=null?p.score_away:"?");
+  if(k==="stoppage|duel") return "Duel "+(p.text||"?");
+  return bonusLabel(p);
 }
 function pickAnswer(p, teamById){
   if(!p) return null;
@@ -635,6 +661,8 @@ function header(){
     var stk=streakOf((D.picks||{})[p.name], D.matches);
     h+='<div class="col c'+(i+1)+'"><div class="name">'+esc(p.name)+'</div>'+
        '<div class="score">'+(p.total_score||0)+'</div>'+
+       (p.stoppage_pot!=null?'<div class="meta pot">Stoppage pot '+(p.stoppage_pot||0)+
+         (p.stoppage_token===1?' · ×2 in hand':'')+'</div>':'')+
        (toks?'<div class="meta">'+toks+' left</div>':'')+
        '<div class="lockst '+(p.locked?'yes':'no')+'">'+(p.locked?'🔒 locked':'not locked')+'</div>'+
        (stk?'<div class="streak '+(stk.hot?"hot":"cold")+'">'+(stk.hot?("▲ "+stk.n+" right"):("▼ "+stk.n+" wrong"))+'</div>':'')+
@@ -692,9 +720,37 @@ function pickCell(pl, m, idx){
     '<div class="pick-score">'+big+'</div>'+
     '<div class="pick-outcome'+ocCls+'">'+ocTxt+'</div>'+tok+note+'</div>';
 }
+function stoppageStrip(m, startedM, fin){
+  // v1.2 pot fixtures: no co-participation (nothing voids), marks come from the manual
+  // pot_points pass, and outcome/exact/Duel rows join the bet chips.
+  if(!startedM){
+    return '<div class="bstrip"><span class="blabel">Stoppage pot — sealed until kickoff</span><div class="bstate">'+
+      [P1(),P2()].map(function(pl){ return '<span class="person"><span class="dot"></span>'+esc(pl.name)+'</span>'; }).join("")+
+      '</div></div>';
+  }
+  var bA=stopPicksFor(D.picks[P1().name], m.fixture_id);
+  var bC=stopPicksFor(D.picks[P2().name], m.fixture_id);
+  if(!bA.length && !bC.length) return "";
+  var scored = fin && [].concat(bA,bC).some(function(p){ return p.pot_points!=null; });
+  var label = scored ? "Stoppage pot — scored" : "Stoppage pot — revealed";
+  var h='<div class="bstrip"><span class="blabel">'+label+'</span><div class="bstate">';
+  [[P1(),bA,1],[P2(),bC,2]].forEach(function(t){
+    var pl=t[0], bets=t[1], i=t[2];
+    if(!bets.length){ h+='<span class="person"><span class="dot"></span>'+esc(pl.name)+' · No bet</span>'; return; }
+    var parts=bets.map(function(p){
+      var mark="";
+      if(p.pot_points!=null)
+        mark = p.pot_points>0 ? ' <span class="hitm">✓ +'+p.pot_points+'</span>' : ' <span class="missm">✗</span>';
+      return esc(stoppageLabel(p, IDX.teamById))+(p.token?" ◆":"")+mark;
+    });
+    h+='<span class="person in w'+i+'"><span class="dot"></span>'+esc(pl.name)+' · '+parts.join(" · ")+'</span>';
+  });
+  return h+'</div></div>';
+}
 function bonusStrip(m){
   var startedM = (m.status && m.status!=="Scheduled") || (m.kickoff && new Date(m.kickoff)<=new Date());
   var fin=m.status==="Finished";
+  if(isStoppageFixture(m.fixture_id)) return stoppageStrip(m, startedM, fin);
   if(!startedM){
     return '<div class="bstrip"><span class="blabel">Bonus bets — revealed at kickoff</span><div class="bstate">'+
       [P1(),P2()].map(function(pl){ return '<span class="person"><span class="dot"></span>'+esc(pl.name)+'</span>'; }).join("")+

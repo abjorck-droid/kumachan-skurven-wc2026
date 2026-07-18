@@ -203,6 +203,45 @@ check("softColor: --p1-soft set from player color at runtime", /setProperty\("--
 check("softColor: .pboth gradient uses the CSS vars", /\.bk-slot\.pboth\{background:linear-gradient\(90deg,var\(--p1-soft\),var\(--p2-soft\)\)/.test(html));
 check("softColor: .ttag.both gradient uses the CSS vars", /\.ttag\.both\{background:linear-gradient\(90deg, ?var\(--p1-soft\), ?var\(--p2-soft\)\)/.test(html));
 
+// ---- v1.2 stoppage pot (docs 08/09): ring-fenced display --------------------
+// Pot rows (type "stoppage_bet") must never join category totals; the header shows
+// each player's pot; the two pot fixtures get their own strip with NO voiding
+// (co-participation is waived for the pot) and labels for outcome/exact/Duel/wild.
+{
+  check("pot: fixture list is the 3rd place + Final pair",
+        Array.isArray(T.STOPPAGE_FIXTURES) && T.STOPPAGE_FIXTURES.join(",") === "1591865,1591866" &&
+        T.isStoppageFixture(1591866) && T.isStoppageFixture("1591865") && !T.isStoppageFixture(100));
+  const picks = [
+    { key: "stoppage|1591866|outcome", type: "stoppage_bet", match_id: 1591866, team_id: 9 },
+    { key: "stoppage|1591866|exact", type: "stoppage_bet", match_id: 1591866, score_home: 2, score_away: 1 },
+    { key: "stoppage|duel", type: "stoppage_bet", match_id: 1591865, text: "Mbappé" },
+    { key: "bonus|1591866|3", type: "stoppage_bet", match_id: 1591866, bet_type: "Hat-trick in match", bet_value: "Yes" },
+    { key: "bonus|100|1", type: "bonus_bet", match_id: 100, bet_type: "BTTS", bet_value: "Yes" },
+  ];
+  const tb = { 9: { code: "ESP" } };
+  check("pot: stopPicksFor filters by type+fixture (Duel rides the 3rd-place anchor)",
+        T.stopPicksFor(picks, 1591866).length === 3 && T.stopPicksFor(picks, 1591865).length === 1);
+  check("pot: bonusPicksFor ignores stoppage rows", T.bonusPicksFor(picks, 1591866).length === 0);
+  check("pot: outcome label resolves the team code", T.stoppageLabel(picks[0], tb) === "Winner ESP");
+  check("pot: exact label", T.stoppageLabel(picks[1], tb) === "Exact 2–1");
+  check("pot: Duel label", T.stoppageLabel(picks[2], tb) === "Duel Mbappé");
+  check("pot: wild bet short label", T.stoppageLabel(picks[3], tb) === "Hat-trick Yes");
+  check("pot: classic short labels intact", T.bonusLabel({ bet_type: "VAR overturn", bet_value: "No" }) === "VAR No" &&
+        T.bonusLabel({ bet_type: "BTTS", bet_value: "Yes" }) === "BTTS Yes");
+  check("pot: header renders stoppage_pot + ×2-in-hand tag",
+        /stoppage_pot!=null\?'<div class="meta pot">Stoppage pot '/.test(html) &&
+        /stoppage_token===1\?' · ×2 in hand'/.test(html));
+  check("pot: header pot line is accent-coded in CSS", /\.h2h \.meta\.pot\{color:var\(--accent\)\}/.test(html));
+  check("pot: bonusStrip routes pot fixtures to stoppageStrip",
+        /if\(isStoppageFixture\(m\.fixture_id\)\) return stoppageStrip\(m, startedM, fin\);/.test(html));
+  check("pot: stoppageStrip never voids (no co-participation)", !/voided|one-sided/.test(
+        (/function stoppageStrip\([\s\S]*?\n\}/.exec(html) || [""])[0]));
+  check("pot: stoppageStrip marks use pot_points, not points",
+        /pot_points>0 \? ' <span class="hitm">/.test(html));
+  check("pot: category totals still ignore stoppage rows (ring-fence)",
+        !/p\.type==="stoppage_bet"[^\n]*c\.(match|bracket|side|dark|bonus)/.test(html));
+}
+
 // ---- bracket-tree Fit view: min-width must cover the columns' summed width ----
 // Regression 2026-07-05: columns totalled 1460px but min-width said 1380px, so
 // offsetWidth under-reported the content, Fit scaled by the wrong ratio, and the
