@@ -39,7 +39,15 @@ function makeStore() {
     const body = opts.body ? JSON.parse(opts.body) : null;
     const ok = (obj) => ({ ok: true, status: 200, json: async () => obj, text: async () => JSON.stringify(obj) });
     if (!tables[table]) return { ok: false, status: 404, text: async () => "no table " + table };
-    if (method === "GET") return ok({ records: tables[table] });
+    if (method === "GET") {
+      // honor fields[] projection like real Airtable — an explicit field list that
+      // omits a field silently hides it (exactly the /api/public pot bug of 07-18)
+      const proj = u.searchParams.getAll("fields[]");
+      const rows = !proj.length ? tables[table]
+        : tables[table].map((r) => ({ id: r.id,
+            fields: Object.fromEntries(Object.entries(r.fields).filter(([k]) => proj.includes(k))) }));
+      return ok({ records: rows });
+    }
     if (method === "DELETE") {
       const ids = u.searchParams.getAll("records[]");
       tables[table] = tables[table].filter((r) => !ids.includes(r.id));
@@ -214,6 +222,19 @@ const rowByLabel = (store, lbl) => store.tables.Predictions.find((r) => r.fields
   mine = (pub.body.picks || {}).Andreas || [];
   check("Final pot rows reveal at the Final kickoff",
     mine.some((p) => p.key === `stoppage|${FID_FINAL}|outcome` && p.pot === "stoppage"));
+}
+
+// ---- /api/public must surface the pot fields (07-18 regression) -------------
+// publicView fetches PoolPlayers with an explicit fields[] list; before the fix it
+// omitted the v1.2 fields, so the board always read pot 0 / token null.
+{
+  const store = makeStore();
+  const me = store.tables.PoolPlayers.find((p) => p.fields.name === "Andreas");
+  me.fields.stoppage_pot = 40; me.fields.stoppage_token_remaining = 1;
+  const pub = await call(store, "/api/public");
+  const pa = (pub.body.players || []).find((p) => p.name === "Andreas") || {};
+  check("public players carry stoppage_pot through the fields[] projection", pa.stoppage_pot === 40);
+  check("public players carry stoppage_token through the fields[] projection", pa.stoppage_token === 1);
 }
 
 summary("test_api_savebonus_stoppage");

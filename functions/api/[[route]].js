@@ -792,7 +792,8 @@ async function listScorers(env) {
 async function publicView(env) {
   const [playerRecs, teamRecs, matchRecs, sideRecs] = await Promise.all([
     atList(env, "PoolPlayers", ["name", "display_color", "total_score",
-      "tokens_remaining_double", "tokens_remaining_triple", "tokens_remaining_allin", "mulligans_remaining"]),
+      "tokens_remaining_double", "tokens_remaining_triple", "tokens_remaining_allin", "mulligans_remaining",
+      "stoppage_pot", "stoppage_token_remaining"]),   // v1.2 — this list gated the pot out of /api/public
     atList(env, "Teams", ["team_id", "code", "name", "group", "fifa_ranking", "kit_color_primary", "flag_emoji"]),
     listPublicMatches(env),
     atList(env, "SideGames", ["name", "base_points", "resolution_type", "resolved_value", "dark_horse_ladder"]),
