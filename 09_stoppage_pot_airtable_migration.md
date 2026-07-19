@@ -58,11 +58,13 @@ notes go in `pundit_note` as usual, revealed on resolution. Per match: 1 outcome
    08 doc menus; ×2 if tokened; +3 Beat-Rival on outcome rows where exactly one was right).
    Two judged types ("Keeper saves penalty", "VAR overturn") are pool-decided, per Glove
    precedent.
-2. After the Final, once the engine has resolved the legacy items (Champion slot, Golden
-   Boot, Golden Glove, Total Tournament Goals):
-   `python3 scripts/setup_stoppage_pot.py --tally`
-   → writes `stoppage_pot`, prints **M**, **N**, and the recorded margin
-   `max(1, M − N)` / `M + |N|`.
+2. Run `python3 scripts/setup_stoppage_pot.py --tally` after every scoring pass — it
+   writes `stoppage_pot` (the board header reads it) and **marks scored pot rows
+   `resolved`, which unseals their pundit notes** in `/api/public`. After the Final,
+   once the engine has resolved the legacy items (Champion slot, Golden Boot, Golden
+   Glove, Total Tournament Goals), the same run prints **M**, **N**, and the recorded
+   margin `max(1, M − N)` / `M + |N|`. Also type The Duel's `resolved_value`
+   (Messi / Mbappé / Level) into SideGames by hand — same as the Glove.
 3. Record the result: recommend a short addendum in the 03 spec changelog with the final
    line ("{winner} d. {runner-up} by {margin}, Stoppage {consolation|bonus} {N}").
 

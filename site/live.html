@@ -739,6 +739,7 @@ function stoppageStrip(m, startedM, fin){
   var scored = fin && [].concat(bA,bC).some(function(p){ return p.pot_points!=null; });
   var label = scored ? "Stoppage pot — scored" : "Stoppage pot — revealed";
   var h='<div class="bstrip"><span class="blabel">'+label+'</span><div class="bstate">';
+  var notes="";
   [[P1(),bA,1],[P2(),bC,2]].forEach(function(t){
     var pl=t[0], bets=t[1], i=t[2];
     if(!bets.length){ h+='<span class="person"><span class="dot"></span>'+esc(pl.name)+' · No bet</span>'; return; }
@@ -746,11 +747,12 @@ function stoppageStrip(m, startedM, fin){
       var mark="";
       if(p.pot_points!=null)
         mark = p.pot_points>0 ? ' <span class="hitm">✓ +'+p.pot_points+'</span>' : ' <span class="missm">✗</span>';
+      if(p.note) notes+='<div class="note-line">'+esc(pl.name)+': “'+esc(p.note)+'”</div>';
       return esc(stoppageLabel(p, IDX.teamById))+(p.token?" ◆":"")+mark;
     });
     h+='<span class="person in w'+i+'"><span class="dot"></span>'+esc(pl.name)+' · '+parts.join(" · ")+'</span>';
   });
-  return h+'</div></div>';
+  return h+'</div>'+notes+'</div>';
 }
 function bonusStrip(m){
   var startedM = (m.status && m.status!=="Scheduled") || (m.kickoff && new Date(m.kickoff)<=new Date());
@@ -767,6 +769,7 @@ function bonusStrip(m){
   var voided = fin && (!bA.length || !bC.length);
   var label = fin ? (voided?"Bonus bets — void (one-sided)":"Bonus bets — resolved") : "Bonus bets — revealed";
   var h='<div class="bstrip"><span class="blabel">'+label+'</span><div class="bstate">';
+  var notes="";   // bonus-bet pundit notes never surfaced before 07-18 — same fix as the pot strip
   [[P1(),bA,1],[P2(),bC,2]].forEach(function(t){
     var pl=t[0], bets=t[1], i=t[2];
     if(!bets.length){ h+='<span class="person"><span class="dot"></span>'+esc(pl.name)+' · No bet</span>'; return; }
@@ -776,11 +779,12 @@ function bonusStrip(m){
         mark = voided ? ' <span class="voidm">void</span>'
              : (p.points>0 ? ' <span class="hitm">✓ +'+(p.points+(p.rival_bonus||0))+'</span>' : ' <span class="missm">✗</span>');
       }
+      if(p.note) notes+='<div class="note-line">'+esc(pl.name)+': “'+esc(p.note)+'”</div>';
       return esc(bonusLabel(p))+(p.token?" ◆":"")+mark;
     });
     h+='<span class="person in w'+i+'"><span class="dot"></span>'+esc(pl.name)+' · '+parts.join(" · ")+'</span>';
   });
-  return h+'</div></div>';
+  return h+'</div>'+notes+'</div>';
 }
 function matchCard(m){
   var live=m.status==="Live", fin=m.status==="Finished";
@@ -1150,11 +1154,15 @@ function sideTab(){
     var notes="";
     var cells=[P1(),P2()].map(function(pl,i){
       if(!pl.locked) return '<span class="chip hidden-pick"><span class="ow"></span>hidden</span>';
-      var p=((D.picks[pl.name])||[]).filter(function(q){return q.type==="side_game"&&q.side_game===sg.name;})[0];
+      // v1.2: the Duel is a SideGames row whose picks are pot rows (type stoppage_bet,
+      // sealed until the 3rd-place kickoff server-side) — match by side_game name, and
+      // score its chip from pot_points, not points.
+      var p=((D.picks[pl.name])||[]).filter(function(q){return (q.type==="side_game"||q.type==="stoppage_bet")&&q.side_game===sg.name;})[0];
       if(!p) return '<span class="chip hidden-pick p'+(i+1)+'"><span class="ow"></span>no pick</span>';
       var ans=pickAnswer(p,IDX.teamById)||"—";
-      var c="chip p"+(i+1)+(p.token?" tok":"")+(p.resolved?(p.points>0?" hit":" miss"):"");
-      var pts=(p.points!=null&&p.resolved)?'<span class="pts">+'+(p.points+(p.rival_bonus||0))+'</span>':"";
+      var val=(p.pot==="stoppage")?p.pot_points:p.points;
+      var c="chip p"+(i+1)+(p.token?" tok":"")+(p.resolved?(val>0?" hit":" miss"):"");
+      var pts=(val!=null&&p.resolved)?'<span class="pts">+'+(val+(p.rival_bonus||0))+'</span>':"";
       if(p.note) notes+='<div class="note-line">'+esc(pl.name)+': “'+esc(p.note)+'”</div>';
       return '<span class="'+c+'"><span class="ow"></span>'+esc(ans)+tokmark(p.token)+pts+'</span>';
     });

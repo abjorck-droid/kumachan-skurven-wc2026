@@ -226,11 +226,12 @@ def migrate(pat, base, dry):
 # ---- tally -----------------------------------------------------------------
 
 def tally(pat, base, dry):
-    preds = at_list(pat, base, "Predictions", ["label", "pot", "pot_points"])
+    preds = at_list(pat, base, "Predictions", ["label", "pot", "pot_points", "resolved"])
     players = at_list(pat, base, "PoolPlayers", ["name", "total_score", "stoppage_pot"])
     names = [r["fields"].get("name") for r in players]
 
     pots = {n: 0 for n in names}
+    to_resolve = []          # scored pot rows: ticking `resolved` unseals their pundit notes
     for r in preds:
         f = r.get("fields", {})
         if f.get("pot") != "stoppage":
@@ -238,6 +239,19 @@ def tally(pat, base, dry):
         owner = next((n for n in names if (f.get("label") or "").startswith(n + "|")), None)
         if owner:
             pots[owner] += f.get("pot_points") or 0
+        if f.get("pot_points") is not None and not f.get("resolved"):
+            to_resolve.append(r["id"])
+
+    if to_resolve:
+        if dry:
+            print(f"  + would mark {len(to_resolve)} scored pot row(s) resolved (unseals notes)")
+        else:
+            for i in range(0, len(to_resolve), 10):
+                http("PATCH", f"{REST}/{base}/Predictions", pat,
+                     {"records": [{"id": rid, "fields": {"resolved": True}}
+                                  for rid in to_resolve[i:i + 10]]})
+                time.sleep(WRITE_PAUSE)
+            print(f"  + marked {len(to_resolve)} scored pot row(s) resolved (notes unsealed)")
 
     print("  Pot totals:")
     ups = []

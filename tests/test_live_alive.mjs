@@ -245,6 +245,17 @@ check("softColor: .ttag.both gradient uses the CSS vars", /\.ttag\.both\{backgro
         /pot_points>0 \? ' <span class="hitm">/.test(html));
   check("pot: category totals still ignore stoppage rows (ring-fence)",
         !/p\.type==="stoppage_bet"[^\n]*c\.(match|bracket|side|dark|bonus)/.test(html));
+  // 07-18 regressions: the Duel's picks are stoppage_bet rows — the Side Bets tab must
+  // match them by side_game name and score the chip from pot_points; pundit notes must
+  // render in both strips (they never did in the classic bonus strip).
+  check("pot: side-bets tab matches stoppage_bet picks by side_game name",
+        /q\.type==="side_game"\|\|q\.type==="stoppage_bet"\)&&q\.side_game===sg\.name/.test(html));
+  check("pot: side-bets chip scores pot rows from pot_points",
+        /var val=\(p\.pot==="stoppage"\)\?p\.pot_points:p\.points;/.test(html));
+  check("pot: stoppage strip renders pundit note-lines",
+        /stoppageStrip[\s\S]*?note-line[\s\S]*?function bonusStrip/.test(html));
+  check("pot: classic bonus strip renders pundit note-lines too",
+        /function bonusStrip\([\s\S]*?note-line/.test(html));
 }
 
 // ---- bracket-tree Fit view: min-width must cover the columns' summed width ----
