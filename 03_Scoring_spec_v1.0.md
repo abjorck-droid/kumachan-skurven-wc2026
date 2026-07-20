@@ -263,3 +263,15 @@ The four questions left open in v0.1, now settled:
 2. **Beat-Rival bonus → +3, confirmed.** Across 64 scoreable matches, the 192-point max is roughly the magnitude of guessing 4 quarter-final winners — present but not dominant.
 3. **All-In strategy note stands:** an All-In on a 5-point group pick yields only 25 — the token is built for high-base picks (Champion = 750, or a Dark Horse on a deep run).
 4. **Total tournament goals → "closest without going over," confirmed.** Forces a committed lower bound rather than rewarding hedged overshoots.
+
+---
+
+## Changelog
+
+- **v1.2 (2026-07-18)** — "Stoppage Time" endgame pot, agreed by both players (Andreas 07-17, Cal 07-18 in chat). All betting on the 3rd Place Final and Final (outcome/exact per spec KO values, bonus bets at 3/match from an expanded menu, one pot-only ×2 token each, the Duel special) scores into a ring-fenced per-player pot converted post-Final into a margin adjustment: max(1, M − N) if N > 0, else M + |N|. Co-participation waived for these two fixtures. Main game consequently decided at adoption. Full text: `08_stoppage_time_amendment_proposal.md`.
+
+### Final result of record (2026-07-19)
+
+> **Andreas d. Cal by 91** — main game 1743–1564 (M = 179), Stoppage consolation N = 88 (pots Cal 113, Andreas 25) → recorded margin max(1, 179 − 88) = **91**.
+>
+> Tournament: Spain 1–0 Argentina a.e.t. (0–0 after 90', Ferran Torres 106'). Golden Boot: Mbappé 10 (Messi 8) — Andreas's ×Double +120. Champion: Spain — Cal's slot +150. Total goals: 308 (Andreas 280 v Cal 187, +60). Golden Glove: Unai Simón, dead for both. The Duel: Mbappé 2–0. Judgment calls, agreed in chat 07-19: second-yellow red counts for "Red card in match" (Cal +20); the ET winner is not a 90'+ stoppage-time goal (both had Yes, both 0).
