@@ -1,6 +1,6 @@
 # Amendment Proposal — "Stoppage Time" Endgame Pot (v1.2 draft)
 
-**Status: ADOPTED 2026-07-17 by Andreas — Variant A (Stoppage Pot); awaiting Cal's sign-off before 3rd Place Final kickoff (Jul 18, 21:00 UTC). Airtable changes: `09_stoppage_pot_airtable_migration.md` + `scripts/setup_stoppage_pot.py`.**
+**Status: ADOPTED — Variant A (Stoppage Pot). Andreas 2026-07-17; Cal signed off in chat 2026-07-18, before 3rd Place Final kickoff. Airtable changes: `09_stoppage_pot_airtable_migration.md` + `scripts/setup_stoppage_pot.py`.**
 
 Two matches remain (FRA–ENG 3rd place, ESP–ARG Final). This proposes a ring-fenced side-pot
 covering all betting on those two fixtures — new outcome/exact betting (including the 3rd-place
