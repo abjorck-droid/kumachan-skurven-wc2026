@@ -1,0 +1,37 @@
+{
+ "exported_at": "2026-07-21T03:07:28.462166+00:00",
+ "tables": {
+  "Teams": {
+   "count": 48,
+   "bytes": 59918
+  },
+  "Footballers": {
+   "count": 1248,
+   "bytes": 308252
+  },
+  "Matches": {
+   "count": 104,
+   "bytes": 638417
+  },
+  "PoolPlayers": {
+   "count": 2,
+   "bytes": 14364
+  },
+  "Predictions": {
+   "count": 535,
+   "bytes": 233885
+  },
+  "SideGames": {
+   "count": 19,
+   "bytes": 7671
+  },
+  "Mulligans": {
+   "count": 2,
+   "bytes": 604
+  },
+  "PollLog": {
+   "count": 4186,
+   "bytes": 1290144
+  }
+ }
+}

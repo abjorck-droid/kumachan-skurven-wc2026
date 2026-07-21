@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>World Cup 2026 — The Record</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Antonio:wght@300;400;500;600;700&family=Cormorant+Garamond:wght@500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0a0b10; --card:#14161d; --card-soft:#1a1d26; --border:rgba(255,255,255,0.08);
+    --border-strong:rgba(255,255,255,0.16); --text:#f0f0f3; --text-dim:#8a8c94; --text-mute:#5a5c64;
+    --accent:#ff1c5c; --gold:#e8b948; --gold-soft:rgba(232,185,72,0.14);
+    --andreas:#219ebc; --andreas-soft:rgba(33,158,188,0.16); --cal:#fb8500; --cal-soft:rgba(251,133,0,0.15);
+    --good:#5ade8c; --bad:#ff5a5a;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:'Inter',-apple-system,sans-serif;-webkit-font-smoothing:antialiased;padding-bottom:90px}
+  .wrap{max-width:760px;margin:0 auto;padding:0 18px}
+  .topbar{position:sticky;top:0;z-index:20;background:rgba(10,11,16,0.92);backdrop-filter:blur(10px);border-bottom:1px solid var(--border)}
+  .topbar-in{max-width:760px;margin:0 auto;padding:14px 18px;display:flex;align-items:baseline;gap:16px;flex-wrap:wrap}
+  .brand{font-family:'Antonio',sans-serif;font-weight:600;font-size:22px;letter-spacing:.02em}
+  .brand .yr{color:var(--accent);font-weight:700}
+  .navl{margin-left:auto;display:flex;gap:14px}
+  .navl a{font-family:'Antonio',sans-serif;font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--text-dim);text-decoration:none}
+  .navl a:hover{color:var(--text)}
+  h2{font-family:'Antonio',sans-serif;font-weight:600;font-size:20px;letter-spacing:.04em;margin:40px 0 4px;text-transform:uppercase}
+  .sub{color:var(--text-dim);font-size:13px;margin-bottom:16px;line-height:1.55}
+  .a{color:var(--andreas)} .c{color:var(--cal)} .g{color:var(--gold)}
+
+  .hero{text-align:center;padding:52px 0 10px}
+  .hero .eyebrow{font-family:'Antonio',sans-serif;font-size:13px;letter-spacing:.22em;text-transform:uppercase;color:var(--text-mute)}
+  .hero .result{font-family:'Cormorant Garamond',serif;font-weight:600;font-size:54px;line-height:1.15;margin:14px 0 4px}
+  .hero .by{font-family:'Cormorant Garamond',serif;font-size:120px;font-weight:600;color:var(--gold);line-height:1;margin:6px 0 2px}
+  .hero .formula{font-family:'Antonio',sans-serif;font-size:13px;letter-spacing:.1em;text-transform:uppercase;color:var(--text-dim);margin-top:10px}
+  .hero .finalline{font-size:14px;color:var(--text-dim);margin-top:18px}
+  .heroboard{display:flex;justify-content:center;gap:14px;margin-top:26px;flex-wrap:wrap}
+  .hb{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:12px 22px;min-width:150px}
+  .hb .l{font-family:'Antonio',sans-serif;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--text-mute)}
+  .hb .v{font-family:'Cormorant Garamond',serif;font-size:30px;font-weight:600;margin-top:2px}
+
+  .legend{display:flex;gap:18px;font-family:'Antonio',sans-serif;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-dim);margin-bottom:8px}
+  .legend .sw{display:inline-block;width:20px;height:3px;border-radius:2px;vertical-align:middle;margin-right:7px}
+  .chartbox{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:14px}
+  .chartbox svg{width:100%;height:auto;display:block}
+  .anno{font-family:'Antonio',sans-serif;font-size:10.5px;letter-spacing:.05em;fill:var(--text-mute);text-transform:uppercase}
+  .axis{font-family:'Antonio',sans-serif;font-size:10px;letter-spacing:.05em;fill:#5a5c64}
+
+  .cats{margin-top:6px}
+  .cat{display:grid;grid-template-columns:150px 1fr 74px;gap:12px;align-items:center;padding:9px 0;border-bottom:1px solid var(--border)}
+  .cat .n{font-family:'Antonio',sans-serif;font-size:12.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--text-dim)}
+  .cat .barzone{position:relative;height:16px}
+  .cat .mid{position:absolute;left:50%;top:-3px;bottom:-3px;width:1px;background:var(--border-strong)}
+  .cat .bar{position:absolute;top:1px;height:14px;border-radius:3px}
+  .cat .bar.ab{background:var(--andreas);left:50%}
+  .cat .bar.cb{background:var(--cal);right:50%}
+  .cat .d{font-family:'Cormorant Garamond',serif;font-size:20px;font-weight:600;text-align:right}
+
+  table.stats{width:100%;border-collapse:collapse;font-size:14px}
+  table.stats th{font-family:'Antonio',sans-serif;font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--text-mute);text-align:right;padding:8px 10px;border-bottom:1px solid var(--border-strong)}
+  table.stats th:first-child{text-align:left}
+  table.stats td{padding:9px 10px;border-bottom:1px solid var(--border);text-align:right;color:var(--text)}
+  table.stats td:first-child{text-align:left;color:var(--text-dim);font-size:13px}
+  table.stats .win{color:var(--good);font-weight:600}
+
+  .feature{border:1px solid rgba(232,185,72,.45);border-radius:10px;background:var(--gold-soft);padding:20px 22px;margin-top:16px}
+  .feature h3{font-family:'Antonio',sans-serif;font-size:15px;letter-spacing:.12em;text-transform:uppercase;color:var(--gold);margin-bottom:10px}
+  .feature p{font-size:14px;line-height:1.65;color:var(--text);margin-bottom:10px}
+  .feature p:last-child{margin-bottom:0}
+  .feature .bigone{font-family:'Cormorant Garamond',serif;font-size:72px;font-weight:600;color:var(--gold);text-align:center;line-height:1;margin:14px 0 4px}
+  .feature .cap{font-family:'Antonio',sans-serif;font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--text-dim);text-align:center;margin-bottom:14px}
+
+  .awards{display:grid;grid-template-columns:repeat(auto-fill,minmax(225px,1fr));gap:10px;margin-top:6px}
+  .aw{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:14px 16px}
+  .aw .t{font-family:'Antonio',sans-serif;font-size:13px;letter-spacing:.09em;text-transform:uppercase;color:var(--gold);margin-bottom:5px}
+  .aw .w{font-size:13.5px;color:var(--text);line-height:1.5}
+  .aw .w small{color:var(--text-dim)}
+
+  .toks{margin-top:6px}
+  .tok{display:grid;grid-template-columns:245px 1fr 56px;gap:12px;align-items:center;padding:7px 0;border-bottom:1px solid var(--border)}
+  .tok .n{font-size:13px;color:var(--text-dim)}
+  .tok .n b{font-family:'Antonio',sans-serif;font-weight:600;letter-spacing:.04em;font-size:12px;text-transform:uppercase}
+  .tok .barzone{height:12px;position:relative}
+  .tok .bar{position:absolute;left:0;top:0;height:12px;border-radius:3px}
+  .tok .v{font-family:'Cormorant Garamond',serif;font-size:19px;font-weight:600;text-align:right}
+  .tok.dead .v{color:var(--bad)}
+  .tok.dead .n{color:var(--text-mute)}
+
+  .quote{background:var(--card);border:1px solid var(--border);border-left:3px solid var(--border-strong);border-radius:6px;padding:16px 18px;margin-bottom:12px}
+  .quote.aq{border-left-color:var(--andreas)} .quote.cq{border-left-color:var(--cal)}
+  .quote .qt{font-family:'Cormorant Garamond',serif;font-size:19px;line-height:1.45;margin-bottom:9px}
+  .quote .att{font-family:'Antonio',sans-serif;font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--text-mute)}
+  .quote .att b{font-weight:600}
+  .quote .att .aa{color:var(--andreas)} .quote .att .cc{color:var(--cal)}
+  .punlist{font-family:'Cormorant Garamond',serif;font-size:19px;line-height:1.9;color:var(--text-dim)}
+
+  .verdict{border:1px solid var(--border-strong);border-radius:10px;background:var(--card);padding:20px 22px;margin-top:16px;font-size:14px;line-height:1.65;color:var(--text)}
+  .verdict b{color:var(--gold);font-family:'Antonio',sans-serif;font-size:12px;letter-spacing:.12em;text-transform:uppercase}
+  footer{margin-top:60px;text-align:center;font-family:'Antonio',sans-serif;font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--text-mute);line-height:2}
+</style>
+</head>
+<body>
+
+<div class="topbar"><div class="topbar-in">
+  <div class="brand">WC<span class="yr">2026</span> — The Record</div>
+  <div class="navl"><a href="/live.html">Live board</a><a href="/index.html">Entry</a></div>
+</div></div>
+
+<div class="wrap">
+
+  <div class="hero">
+    <div class="eyebrow">Kumachan v Skurven · June 11 — July 19, 2026 · Books closed</div>
+    <div class="result"><span class="a">Andreas</span> d. <span class="c">Cal</span></div>
+    <div class="by">91</div>
+    <div class="formula">max(1, M − N) &nbsp;=&nbsp; max(1, 179 − 88) &nbsp;=&nbsp; 91</div>
+    <div class="heroboard">
+      <div class="hb"><div class="l">Main board</div><div class="v"><span class="a">1743</span> – <span class="c">1564</span></div></div>
+      <div class="hb"><div class="l">Stoppage pot</div><div class="v"><span class="c">113</span> – <span class="a">25</span></div></div>
+      <div class="hb"><div class="l">Predictions scored</div><div class="v">535</div></div>
+    </div>
+    <div class="finalline">The Final: Spain 1–0 Argentina a.e.t. · Ferran Torres 106' · Golden Boot: Mbappé 10 · Champion: España</div>
+  </div>
+
+  <h2>The race</h2>
+  <div class="sub">Cumulative points, all sources, June 11 → July 19. Four lead changes in the first week. Dead level at 462 on June 23 — then Cal never led again.</div>
+  <div class="legend">
+    <span><span class="sw" style="background:var(--andreas)"></span>Andreas</span>
+    <span><span class="sw" style="background:var(--cal)"></span>Cal</span>
+  </div>
+  <div class="chartbox">
+  <svg viewBox="0 0 700 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Cumulative score race, Andreas 1743 Cal 1564">
+    <g stroke="rgba(255,255,255,0.06)" stroke-width="1">
+      <line x1="46" y1="294" x2="690" y2="294"/><line x1="46" y1="247" x2="690" y2="247"/>
+      <line x1="46" y1="200" x2="690" y2="200"/><line x1="46" y1="153" x2="690" y2="153"/>
+      <line x1="46" y1="106" x2="690" y2="106"/><line x1="46" y1="59" x2="690" y2="59"/>
+      <line x1="46" y1="12" x2="690" y2="12"/>
+    </g>
+    <g class="axis" text-anchor="end">
+      <text x="40" y="297">0</text><text x="40" y="250">300</text><text x="40" y="203">600</text>
+      <text x="40" y="156">900</text><text x="40" y="109">1200</text><text x="40" y="62">1500</text><text x="40" y="15">1800</text>
+    </g>
+    <g class="axis" text-anchor="middle">
+      <text x="46" y="311">Jun 11</text><text x="164.6" y="311">Jun 18</text><text x="283.3" y="311">Jun 25</text>
+      <text x="401.9" y="311">Jul 2</text><text x="520.5" y="311">Jul 9</text><text x="639.2" y="311">Jul 16</text>
+    </g>
+    <line x1="486.6" y1="12" x2="486.6" y2="294" stroke="rgba(232,185,72,0.35)" stroke-width="1" stroke-dasharray="3,4"/>
+    <polyline points="46.0,293.2 62.9,287.3 79.9,282.1 96.8,279.7 113.8,275.0 130.7,267.2 147.7,257.8 164.6,257.8 181.6,250.3 198.5,243.2 215.5,238.1 232.4,231.0 249.4,221.6 266.3,202.0 283.3,199.2 300.2,188.2 317.2,183.4 334.1,181.4 351.1,179.0 401.9,168.8 418.8,162.6 435.8,146.1 469.7,143.0 486.6,128.9 520.5,128.9 537.5,125.7 571.4,119.5 622.2,72.5 690.0,49.0" fill="none" stroke="#fb8500" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+    <polyline points="46.0,293.2 62.9,286.2 79.9,282.6 96.8,280.2 113.8,273.5 130.7,266.0 147.7,250.9 164.6,248.4 181.6,243.2 198.5,237.0 215.5,229.1 232.4,224.4 249.4,221.6 266.3,200.5 283.3,195.3 300.2,185.4 317.2,177.1 334.1,174.0 351.1,170.9 401.9,160.7 418.8,156.0 435.8,143.1 469.7,140.8 486.6,92.2 520.5,89.9 537.5,85.2 571.4,72.6 622.2,49.1 690.0,20.9" fill="none" stroke="#219ebc" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+    <circle cx="249.4" cy="221.6" r="4" fill="#e8b948"/>
+    <text x="249.4" y="238" class="anno" text-anchor="middle">Jun 23 · 462–462</text>
+    <text x="483" y="26" class="anno" text-anchor="end">Jul 7 · Dark Horse Day · +310</text>
+    <circle cx="486.6" cy="92.2" r="4" fill="#219ebc"/>
+    <circle cx="571.4" cy="72.6" r="3.5" fill="#219ebc"/>
+    <text x="571.4" y="60" class="anno" text-anchor="middle">peak +299</text>
+    <circle cx="690" cy="20.9" r="4" fill="#219ebc"/>
+    <circle cx="690" cy="49" r="4" fill="#fb8500"/>
+  </svg>
+  </div>
+
+  <h2>Where the 179 was won</h2>
+  <div class="sub">Andreas's edge by category (blue, right) against Cal's (orange, left). Two playstyles in football clothing: Cal built the engine; Andreas played tempo and took the flanks.</div>
+  <div class="cats">
+    <div class="cat"><div class="n">Side games</div><div class="barzone"><div class="mid"></div><div class="bar ab" style="width:39%"></div></div><div class="d a">+225</div></div>
+    <div class="cat"><div class="n">Dark horse</div><div class="barzone"><div class="mid"></div><div class="bar ab" style="width:39%"></div></div><div class="d a">+225</div></div>
+    <div class="cat"><div class="n">Match outcomes</div><div class="barzone"><div class="mid"></div><div class="bar ab" style="width:11%"></div></div><div class="d a">+62</div></div>
+    <div class="cat"><div class="n">Rivalry bonus</div><div class="barzone"><div class="mid"></div><div class="bar ab" style="width:2%"></div></div><div class="d a">+12</div></div>
+    <div class="cat"><div class="n">Bonus bets</div><div class="barzone"><div class="mid"></div><div class="bar cb" style="width:8%"></div></div><div class="d c">+45</div></div>
+    <div class="cat"><div class="n">Bracket slots</div><div class="barzone"><div class="mid"></div><div class="bar cb" style="width:50%"></div></div><div class="d c">+288</div></div>
+  </div>
+
+  <h2>The sharpshooting ledger</h2>
+  <div class="sub">Live bets only — voided abstention-war bets excluded (see below). On shared ground you were nearly twins: two bets per match each, averages three-tenths of a point apart.</div>
+  <table class="stats">
+    <tr><th></th><th class="a">Andreas</th><th class="c">Cal</th></tr>
+    <tr><td>Match outcomes</td><td class="win">44/72 (61%)</td><td>40/72 (56%)</td></tr>
+    <tr><td>Exact scores</td><td class="win">3/60</td><td>0/61</td></tr>
+    <tr><td>Live bonus bets</td><td>45/79 · 680 pts</td><td class="win">45/80 · 725 pts</td></tr>
+    <tr><td>Points per live bonus bet</td><td>8.61</td><td class="win">9.06</td></tr>
+    <tr><td>Rivalry bonuses</td><td class="win">12 (+36)</td><td>8 (+24)</td></tr>
+  </table>
+  <div class="sub" style="margin-top:10px">The only exact scores of the season, all Andreas's: Ghana 1–0 Panama, Argentina 3–0 Algeria, and — prophetically — Spain 4–0 Saudi Arabia.</div>
+
+  <h2>The abstention war</h2>
+  <div class="sub">The co-participation gate voided every bonus bet on matches only one player entered. Andreas entered 36 matches alone (72 bets); Cal entered 7 alone (13 bets). Resolved against the actual events:</div>
+  <table class="stats">
+    <tr><th>Voided, resolved after the fact</th><th class="a">Andreas</th><th class="c">Cal</th></tr>
+    <tr><td>Bets voided by the gate</td><td>72</td><td>13</td></tr>
+    <tr><td>Would-have hit</td><td>43 (60%)</td><td class="win">11 (85%)</td></tr>
+    <tr><td>Points left in the void</td><td>610</td><td>190</td></tr>
+  </table>
+  <div class="feature">
+    <h3>The one-point championship that wasn't</h3>
+    <p>Had Cal answered Andreas's 36 solo matches at his own live average, he'd have added ≈653 points — but unvoiding hands Andreas his 610 actual points back: net ≈43 to Cal. The sting: Andreas's <em>voided</em> bets were his best material of the tournament.</p>
+    <p>Run the full no-abstention world — both players answer everything — and the main margin collapses from 179 to ≈58. The pot stood at N = 88. The conversion formula does the rest:</p>
+    <div class="bigone">max(1, 58 − 88) = 1</div>
+    <div class="cap">The archive would record the 2026 World Cup as decided by a single point</div>
+    <p>Doc 08 called the abstention line "degenerate." It was right. The gate didn't just void bets — it voided the greatest finish this pool never had. It dies in the Euros 2028 ruleset.</p>
+  </div>
+
+  <h2>The honours</h2>
+  <div class="awards">
+    <div class="aw"><div class="t">Call of the tournament</div><div class="w"><span class="a">Andreas</span> — Dark Horse Norway ×Triple, ridden through the R16. <small>225 pts, the season's largest single haul.</small></div></div>
+    <div class="aw"><div class="t">The iron nerve</div><div class="w"><span class="c">Cal</span> — All-In on Argentina reaching the Final. <small>Locked cold, paid 200.</small></div></div>
+    <div class="aw"><div class="t">The sniper</div><div class="w"><span class="c">Cal</span> — 9.06 points per live bonus bet, and an 85% would-have-hit rate on his voided ones.</div></div>
+    <div class="aw"><div class="t">The prophet</div><div class="w"><span class="a">Andreas</span> — the only three exact scores of the tournament, 121 attempts between you.</div></div>
+    <div class="aw"><div class="t">The Icarus</div><div class="w"><span class="c">Cal</span> — Morocco ×Triple to the semi-finals. <small>The sun was lovely though.</small></div></div>
+    <div class="aw"><div class="t">The Cartagena cup</div><div class="w"><span class="a">Andreas</span> — All-In England, champions of the world. <small>0 of 750. See the canon, below.</small></div></div>
+  </div>
+
+  <h2>The token ledger</h2>
+  <div class="sub">Sixteen conviction signals: 4×Double, 2×Triple, 1×All-In each, plus the pot's Stoppage ×2s. Andreas drew 535 points from his (+325 over base); Cal 310 (+215). Six died.</div>
+  <div class="toks">
+    <div class="tok"><div class="n"><b class="a">A</b> · Dark Horse Norway <b class="g">×3</b></div><div class="barzone"><div class="bar" style="background:var(--andreas);width:100%"></div></div><div class="v a">225</div></div>
+    <div class="tok"><div class="n"><b class="c">C</b> · Argentina to the Final <b class="g">All-In</b></div><div class="barzone"><div class="bar" style="background:var(--cal);width:89%"></div></div><div class="v c">200</div></div>
+    <div class="tok"><div class="n"><b class="a">A</b> · Golden Boot Mbappé <b class="g">×2</b></div><div class="barzone"><div class="bar" style="background:var(--andreas);width:53%"></div></div><div class="v a">120</div></div>
+    <div class="tok"><div class="n"><b class="a">A</b> · Spain to the Final <b class="g">×3</b></div><div class="barzone"><div class="bar" style="background:var(--andreas);width:53%"></div></div><div class="v a">120</div></div>
+    <div class="tok"><div class="n"><b class="c">C</b> · Spain to the Final <b class="g">×2</b></div><div class="barzone"><div class="bar" style="background:var(--cal);width:36%"></div></div><div class="v c">80</div></div>
+    <div class="tok"><div class="n"><b class="a">A</b> · Total goals 280 <b class="g">×2</b></div><div class="barzone"><div class="bar" style="background:var(--andreas);width:27%"></div></div><div class="v a">60</div></div>
+    <div class="tok"><div class="n"><b class="a">A</b> · Norway to R16 <b class="g">×2</b></div><div class="barzone"><div class="bar" style="background:var(--andreas);width:4.5%"></div></div><div class="v a">10</div></div>
+    <div class="tok"><div class="n"><b class="c">C</b> · England to R16 <b class="g">×2</b></div><div class="barzone"><div class="bar" style="background:var(--cal);width:4.5%"></div></div><div class="v c">10</div></div>
+    <div class="tok"><div class="n"><b class="c">C</b> · Portugal to R16 <b class="g">×2</b></div><div class="barzone"><div class="bar" style="background:var(--cal);width:4.5%"></div></div><div class="v c">10</div></div>
+    <div class="tok"><div class="n"><b class="c">C</b> · Spain to R16 <b class="g">×2</b></div><div class="barzone"><div class="bar" style="background:var(--cal);width:4.5%"></div></div><div class="v c">10</div></div>
+    <div class="tok dead"><div class="n"><b class="a">A</b> · England champion <b class="g">ALL-IN</b> †</div><div class="barzone"></div><div class="v">0</div></div>
+    <div class="tok dead"><div class="n"><b class="a">A</b> · England to the Final <b class="g">×2</b> †</div><div class="barzone"></div><div class="v">0</div></div>
+    <div class="tok dead"><div class="n"><b class="a">A</b> · Argentina wins the Final <b class="g">Stoppage ×2</b> †</div><div class="barzone"></div><div class="v">0</div></div>
+    <div class="tok dead"><div class="n"><b class="c">C</b> · Morocco to the semis <b class="g">×3</b> †</div><div class="barzone"></div><div class="v">0</div></div>
+    <div class="tok dead"><div class="n"><b class="c">C</b> · Group A top scorer <b class="g">×3</b> †</div><div class="barzone"></div><div class="v">0</div></div>
+    <div class="tok dead"><div class="n"><b class="c">C</b> · 3rd-place bonus <b class="g">Stoppage ×2</b> †</div><div class="barzone"></div><div class="v">0</div></div>
+  </div>
+
+  <h2>The canon</h2>
+  <div class="sub">84 pundit notes were sealed during play and unsealed when the books closed. These are the texts scholars will consult. Attribution marks the author; history marks the outcome.</div>
+
+  <div class="quote cq"><div class="qt">"¡Zeus cumple la profecía! As it was made to be so, those many years ago, in the tiny unseen eddies of holy UNICEF tub water, during that fateful paparazzi'd rinse. Our old Messi-ah, the GOAT, incarnate — a modern Kronos? We the watching world, his Rhea? Were ours the fingers who dumplinged up his Spanish usurper-son in a blanket of lies? Lies of our love? We doted deceitful? Could that be????"</div><div class="att"><b class="cc">Cal</b> · Spain to win the Final · <span style="color:var(--good)">the prophecy was fulfilled</span></div></div>
+
+  <div class="quote aq"><div class="qt">"España tocará la pelota novecientas veces. Argentina la tocará dos. Adivina quién levanta la copa."</div><div class="att"><b class="aa">Andreas</b> · exact-score pick, the Final · <span style="color:var(--bad)">correctly forecast Spain's dominance while betting on Argentina</span></div></div>
+
+  <div class="quote aq"><div class="qt">"Just like in The Battle of Cartagena de Indias in 1741! Well done, lads!"</div><div class="att"><b class="aa">Andreas</b> · All-In, England champion · <span style="color:var(--bad)">Cartagena 1741 was a catastrophic British defeat. To Spain. Who won this World Cup.</span></div></div>
+
+  <div class="quote aq"><div class="qt">"España tiene el balón, Argentina tiene la copa, y Cal tiene una foto del trofeo que nunca va a tocar."</div><div class="att"><b class="aa">Andreas</b> · Stoppage ×2, Argentina wins the Final · <span style="color:var(--bad)">Spain took the ball and the cup; Cal's España pick paid 53</span></div></div>
+
+  <div class="quote cq"><div class="qt">"COCKS AND BALLS! THE GAME IS BROKEN AND GLOBAL WARMING IS INVITING AN ALGAE BLOOM ON THE OPEN OCEAN."</div><div class="att"><b class="cc">Cal</b> · stoppage bonus, the 3rd place final · <span style="color:var(--bad)">0 points, worth every one</span></div></div>
+
+  <div class="quote cq"><div class="qt">"THE KING REIGNS."</div><div class="att"><b class="cc">Cal</b> · The Duel, backing Messi · <span style="color:var(--bad)">Mbappé won it 2–0. The king did not reign.</span></div></div>
+
+  <div class="quote aq"><div class="qt">"Nice dark horse you've got there, Cal. Shame if something were to happen to it."</div><div class="att"><b class="aa">Andreas</b> · bonus bet, Türkiye v Paraguay · <span style="color:var(--bad)">something happened to it</span></div></div>
+
+  <div class="quote cq"><div class="qt">"OH NO!!!!!! HAALAND!!! OR HAALAND FRIEND!!! Dre, I'm SO sorry for your embarrassing loss."</div><div class="att"><b class="cc">Cal</b> · First Own Goal: Norway · <span style="color:var(--bad)">Norway never own-goaled; they carried Andreas's Triple to 225 instead</span></div></div>
+
+  <div class="quote cq"><div class="qt">"Sorry lads................"</div><div class="att"><b class="cc">Cal</b> · England to the quarter-finals · <span style="color:var(--good)">ten points, twelve periods of pain</span></div></div>
+
+  <div class="quote cq"><div class="qt">"'realistic, Cal' — 'oh, thanks :)'"</div><div class="att"><b class="cc">Cal</b> · exact-score pick, negotiating with himself · <span style="color:var(--bad)">the negotiation failed</span></div></div>
+
+  <div class="quote aq"><div class="qt">"a"</div><div class="att"><b class="aa">Andreas</b> · bonus bet, Brazil v Haiti · <span style="color:var(--text-mute)">the minimalist masterpiece. Scholars are divided.</span></div></div>
+
+  <div class="quote aq"><div class="qt">"Vikings don't get red cards — we're nice boys."</div><div class="att"><b class="aa">Andreas</b> · no red card, Norway v France · <span style="color:var(--good)">hit, 20 points, on a match Norway lost — "We fought valiantly!"</span></div></div>
+
+  <h2>The pun codex</h2>
+  <div class="punlist">"I haiti do this to you" · "It was always ghana go this way" · "How Embolo can you go?" · "You Lukakuing at me??" · "The Lionel Nessie monster appears! Can't spell legend without L-E-O!" · "It was wirtz it!" · "Someone call the puli-sic!" · "Mbappé? More like Slap-bé." · "Cautioh: Harrykane warning in effect!" · "Vini, vidi, vici!"</div>
+
+  <h2>The v1.2 verdict</h2>
+  <div class="verdict">
+    <b>Ruling</b> — The Stoppage pot is a permanent rule from day one of Euros 2028. The main board was functionally decided on July 7; under v1.0 the Final would have been a formality. Instead Cal's Spain conviction filled the pot 113–25, carved the recorded margin from 179 to 91, and kept the last kick of the season meaningful — winner untouched, blowout civilized, The Duel and the Golden Glove generated as free content along the way. The pot did exactly what it said on the amendment.
+  </div>
+
+  <footer>
+    Books closed 2026-07-19 · Result of record: Andreas d. Cal by 91<br>
+    Carved at the wrap-up party, 2026-07-20/21 · Euros 2028 awaits · The Cartagena cup stands ready
+  </footer>
+
+</div>
+</body>
+</html>

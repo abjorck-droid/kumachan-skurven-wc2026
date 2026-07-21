@@ -1,0 +1,305 @@
+[
+ {
+  "id": "rec0qErebYrmoiTZh",
+  "createdTime": "2026-07-18T08:38:52.000Z",
+  "fields": {
+   "base_points": 25,
+   "description": "Stoppage-pot special (v1.2): Messi vs Mbappé, goals scored across the 3rd Place Final and the Final combined. Pick Messi / Mbappé / Level (predicted_text). Scores into pot_points, not the main game.",
+   "lock_at_utc": "2026-07-18T21:00:00.000Z",
+   "name": "The Duel",
+   "Predictions": [
+    "recfq0DEqgDPEc1JN",
+    "recebL6H4JG7yyaDd"
+   ],
+   "resolution_type": "player",
+   "resolved_value": "Mbappé"
+  }
+ },
+ {
+  "id": "rec15fwJxoF6JVWG2",
+  "createdTime": "2026-06-05T21:37:13.000Z",
+  "fields": {
+   "base_points": 15,
+   "description": "Top scorer of Group K.",
+   "resolved_at": "2026-06-28T01:45:54.000Z",
+   "name": "Top Scorer Group K",
+   "Predictions": [
+    "rechq7puI5D8WPSud",
+    "recd75SVbEWaGWZqM"
+   ],
+   "resolution_type": "player",
+   "resolved_value": "Y. Wissa"
+  }
+ },
+ {
+  "id": "rec4T7Qh5CAMLCLzx",
+  "createdTime": "2026-06-05T21:37:13.000Z",
+  "fields": {
+   "base_points": 15,
+   "description": "Top scorer of Group A.",
+   "resolved_at": "2026-06-25T03:00:32.000Z",
+   "name": "Top Scorer Group A",
+   "Predictions": [
+    "recfAvICDZnUYeqMx",
+    "recdrDbqVFm0We8on"
+   ],
+   "resolution_type": "player",
+   "resolved_value": "J. Quiñones"
+  }
+ },
+ {
+  "id": "rec6mFeuaOuRvs9lj",
+  "createdTime": "2026-06-05T21:37:13.000Z",
+  "fields": {
+   "base_points": 15,
+   "description": "Top scorer of Group G.",
+   "resolved_at": "2026-06-27T05:16:06.000Z",
+   "name": "Top Scorer Group G",
+   "Predictions": [
+    "recrG1nueuQ6U3hUw",
+    "recIofNLFsbuVq4Ou"
+   ],
+   "resolution_type": "player",
+   "resolved_value": "E. Just"
+  }
+ },
+ {
+  "id": "rec7KBBaLg3uRMykL",
+  "createdTime": "2026-06-05T21:37:13.000Z",
+  "fields": {
+   "base_points": 15,
+   "description": "Top scorer of Group L.",
+   "resolved_at": "2026-06-27T23:01:05.000Z",
+   "name": "Top Scorer Group L",
+   "Predictions": [
+    "recCA9dHmxel9DfBN",
+    "recUpi7D9BwoRnCtG"
+   ],
+   "resolution_type": "player",
+   "resolved_value": "H. Kane"
+  }
+ },
+ {
+  "id": "recA2bTmPMox2xToY",
+  "createdTime": "2026-06-05T21:37:13.000Z",
+  "fields": {
+   "base_points": 15,
+   "description": "Top scorer of Group E.",
+   "resolved_at": "2026-06-25T22:01:15.000Z",
+   "name": "Top Scorer Group E",
+   "Predictions": [
+    "recBbBszOTgXLrFM4",
+    "recYN3m6nWMAFBRNb"
+   ],
+   "resolution_type": "player",
+   "resolved_value": "D. Undav"
+  }
+ },
+ {
+  "id": "recDiwyYeEkN5ppu7",
+  "createdTime": "2026-06-05T21:37:13.000Z",
+  "fields": {
+   "base_points": 15,
+   "description": "Top scorer of Group B.",
+   "resolved_at": "2026-06-24T20:59:40.000Z",
+   "name": "Top Scorer Group B",
+   "Predictions": [
+    "recvUoQ0oVFlIDrbs",
+    "recOAOfIA45Hrq2o3"
+   ],
+   "resolution_type": "player",
+   "resolved_value": "J. David | J. Manzambi"
+  }
+ },
+ {
+  "id": "recKF4ZwMy0mFHLDo",
+  "createdTime": "2026-06-05T21:37:13.000Z",
+  "fields": {
+   "base_points": 15,
+   "description": "Top scorer of Group I.",
+   "resolved_at": "2026-06-26T21:15:56.000Z",
+   "name": "Top Scorer Group I",
+   "Predictions": [
+    "recDtbltZfunCTLQ3",
+    "reckRwrGYwW15VsEe"
+   ],
+   "resolution_type": "player",
+   "resolved_value": "E. Haaland | Kylian Mbappé | O. Dembélé"
+  }
+ },
+ {
+  "id": "recOEStNKbXSxvwaB",
+  "createdTime": "2026-06-05T21:37:13.000Z",
+  "fields": {
+   "base_points": 60,
+   "description": "Most clean sheets among GKs reaching at least the QF.",
+   "name": "Golden Glove",
+   "Predictions": [
+    "recn5eFgB3gYDIslD",
+    "recCz1DIsUScp32aM"
+   ],
+   "resolution_type": "player",
+   "resolved_value": "Unai Simón"
+  }
+ },
+ {
+  "id": "recSfwSHWz7aCPGBh",
+  "createdTime": "2026-06-05T21:37:13.000Z",
+  "fields": {
+   "base_points": 15,
+   "description": "Top scorer of Group J.",
+   "resolved_at": "2026-06-28T04:01:09.000Z",
+   "name": "Top Scorer Group J",
+   "Predictions": [
+    "recslZLLa815laUU4",
+    "recEzvEYPRh2hJJnh"
+   ],
+   "resolution_type": "player",
+   "resolved_value": "L. Messi"
+  }
+ },
+ {
+  "id": "recTb1JVYH13xHYJZ",
+  "createdTime": "2026-06-05T21:37:13.000Z",
+  "fields": {
+   "base_points": 15,
+   "description": "Top scorer of Group H.",
+   "resolved_at": "2026-06-27T02:15:56.000Z",
+   "name": "Top Scorer Group H",
+   "Predictions": [
+    "recqmuWywP6c5egzc",
+    "rec1bvFJrfy5tN8AA"
+   ],
+   "resolution_type": "player",
+   "resolved_value": "M. Araújo | Mikel Oyarzabal"
+  }
+ },
+ {
+  "id": "recYMtlwzS5lWrD1T",
+  "createdTime": "2026-06-05T21:37:13.000Z",
+  "fields": {
+   "base_points": 15,
+   "description": "Top scorer of Group C.",
+   "resolved_at": "2026-06-25T00:15:23.000Z",
+   "name": "Top Scorer Group C",
+   "Predictions": [
+    "rec3tRt7Tk36ffzHO",
+    "recfw1FM5hMs3oLbH"
+   ],
+   "resolution_type": "player",
+   "resolved_value": "Vinícius Júnior"
+  }
+ },
+ {
+  "id": "recdeUY5PCRbv6pcw",
+  "createdTime": "2026-06-05T21:37:13.000Z",
+  "fields": {
+   "base_points": 15,
+   "description": "Top scorer of Group D.",
+   "resolved_at": "2026-06-26T04:15:57.000Z",
+   "name": "Top Scorer Group D",
+   "Predictions": [
+    "recc7J3iyDHYKeWZK",
+    "recbUIpL67wib5rM6"
+   ],
+   "resolution_type": "player",
+   "resolved_value": "F. Balogun"
+  }
+ },
+ {
+  "id": "recfm924kISPOAlHK",
+  "createdTime": "2026-06-05T21:37:13.000Z",
+  "fields": {
+   "base_points": 60,
+   "description": "Top scorer of the tournament.",
+   "resolved_at": "2026-07-19T22:15:22.000Z",
+   "name": "Golden Boot",
+   "Predictions": [
+    "recdo7PagetfwOJxg",
+    "recaSochJcKboCcJG"
+   ],
+   "resolution_type": "player",
+   "resolved_value": "Kylian Mbappé"
+  }
+ },
+ {
+  "id": "rechDubdGAaZpHUVn",
+  "createdTime": "2026-06-05T21:37:13.000Z",
+  "fields": {
+   "base_points": 0,
+   "description": "Team ranked outside FIFA top 16 at lock. Escalating ladder payout.",
+   "dark_horse_ladder": "{\"R16\": 25, \"QF\": 75, \"SF\": 200, \"Final\": 500, \"Champion\": 1000}",
+   "name": "Dark Horse",
+   "Predictions": [
+    "recW0ArSkcfkO6ogn",
+    "rec8FJ9G1hq39XQ7B",
+    "recayFQt1ZN4hOLsS"
+   ],
+   "resolution_type": "team"
+  }
+ },
+ {
+  "id": "reciP8gMqWIn97xfF",
+  "createdTime": "2026-06-05T21:37:13.000Z",
+  "fields": {
+   "base_points": 15,
+   "description": "Top scorer of Group F.",
+   "resolved_at": "2026-06-26T01:00:59.000Z",
+   "name": "Top Scorer Group F",
+   "Predictions": [
+    "recRDlPB5cFyVtzkw",
+    "recSKwtenqZTBWWol"
+   ],
+   "resolution_type": "player",
+   "resolved_value": "B. Brobbey"
+  }
+ },
+ {
+  "id": "recjvO1TCtHzMkYa6",
+  "createdTime": "2026-06-05T21:37:13.000Z",
+  "fields": {
+   "base_points": 30,
+   "description": "Name the player shown the first red card of the tournament.",
+   "resolved_at": "2026-06-11T21:07:47.000Z",
+   "name": "First Red Card",
+   "Predictions": [
+    "recmDrV6c2Oj7dMnC",
+    "rectthb9BUqlX3ncP"
+   ],
+   "resolution_type": "event_player",
+   "resolved_value": "South Africa"
+  }
+ },
+ {
+  "id": "recpAIb23ShsPAwgK",
+  "createdTime": "2026-06-05T21:37:13.000Z",
+  "fields": {
+   "base_points": 30,
+   "description": "Closest without going over.",
+   "resolved_at": "2026-07-19T22:15:22.000Z",
+   "name": "Total Tournament Goals",
+   "Predictions": [
+    "recqdozypauVCRp6g",
+    "recYYjeBWS52Ryu9s"
+   ],
+   "resolution_type": "scalar",
+   "resolved_value": "308"
+  }
+ },
+ {
+  "id": "recsyfNkWk3Ym0zQG",
+  "createdTime": "2026-06-05T21:37:13.000Z",
+  "fields": {
+   "base_points": 40,
+   "description": "Name the player who scores the first own goal.",
+   "resolved_at": "2026-06-13T03:15:21.000Z",
+   "name": "First Own Goal",
+   "Predictions": [
+    "recexHNpIqx8IdKZ0",
+    "rec8fP3T6NCV1RDP9"
+   ],
+   "resolution_type": "event_player",
+   "resolved_value": "Paraguay"
+  }
+ }
+]
