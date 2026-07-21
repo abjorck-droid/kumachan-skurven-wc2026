@@ -344,6 +344,15 @@ def main():
     pool = at_list(base, "PoolPlayers", pat, fields=["name"])
     rec2player = {r["id"]: r["fields"].get("name") for r in pool}
     preds = at_list(base, "Predictions", pat)
+    # v1.2: stoppage-pot rows are tally-owned — pot_points and `resolved` are written by
+    # scripts/setup_stoppage_pot.py --tally, never by the engine. Before 2026-07-21 the
+    # blanket finalize below rewrote resolved=False on them every run (the type dispatch
+    # doesn't know stoppage_bet), re-sealing their pundit notes on the live board hours
+    # after the tally had unsealed them. Drop pot rows here so the engine never sees them;
+    # they carry points_awarded 0 and are excluded from total_score either way.
+    preds = [r for r in preds
+             if r.get("fields", {}).get("pot") != "stoppage"
+             and r.get("fields", {}).get("prediction_type") != "stoppage_bet"]
     preds.sort(key=lambda r: r.get("fields", {}).get("label", ""))   # deterministic dedupe order
     mulls = at_list(base, "Mulligans", pat, fields=["original_prediction", "new_prediction"])
     mull_affected = mulligan_affected(mulls)

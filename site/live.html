@@ -132,6 +132,14 @@
   .bstrip .person.in.w1 .dot{background:var(--p1)} .bstrip .person.in.w2 .dot{background:var(--p2)}
   .bstrip .person .hitm{color:var(--good)} .bstrip .person .missm{color:var(--bad)}
   .bstrip .person .voidm{color:var(--text-mute);font-style:italic}
+  /* note-lines inside the strip: .note-line's grid-column is a no-op in this flex
+     container, so without a basis the notes share a row with the bet chips and get
+     crowded out on chip-heavy cards (the pot fixtures run 5–6 chips per player).
+     Full-basis forces each note onto its own row under the chips. */
+  .bstrip .note-line{flex-basis:100%;font-size:14.5px;font-family:'Architects Daughter',cursive;
+    text-transform:none;letter-spacing:0}
+  .bstrip .note-line.sealed{font-family:'Antonio',sans-serif;font-size:10px;letter-spacing:.12em;
+    text-transform:uppercase;color:var(--text-mute);font-style:normal}
 
   /* legacy compact rows (kept for bonus chip line reuse) */
   .mrow{display:grid;grid-template-columns:minmax(190px,1.1fr) 86px minmax(180px,1fr);gap:10px;align-items:center;
@@ -536,6 +544,26 @@ function koRound(r){
   return null;
 }
 function numRound(no){ for(var r in BR_NUMS){ if(BR_NUMS[r].indexOf(no)>=0) return r; } return null; }
+function roundSections(fin){
+  // Post-tournament archive grouping, newest stage first: Final → 3rd place → SF → QF →
+  // R16 → R32 → group matchdays 3→1. Within a section, kickoff order (as played).
+  var KO=[["f","The Final"],["3rd","Third place"],["sf","Semi-finals"],["qf","Quarter-finals"],
+          ["r16","Round of 16"],["r32","Round of 32"]];
+  var by={}, md={};
+  (fin||[]).forEach(function(m){
+    var r=koRound(m.round);
+    if(r){ (by[r]=by[r]||[]).push(m); return; }
+    var g=/Group Stage - (\d+)/.exec(String(m.round||""));
+    (md[g?g[1]:"?"]=md[g?g[1]:"?"]||[]).push(m);
+  });
+  var out=[];
+  KO.forEach(function(t){ if(by[t[0]]) out.push({label:t[1], matches:by[t[0]]}); });
+  Object.keys(md).sort().reverse().forEach(function(k){
+    out.push({label:k==="?"?"Group stage":"Group stage · Matchday "+k, matches:md[k]});
+  });
+  out.forEach(function(s){ s.matches.sort(function(a,b){ return (a.kickoff||"").localeCompare(b.kickoff||""); }); });
+  return out;
+}
 function buildKoIndex(matches, fixToNo){
   // matchNo -> fixture. Explicit map (site/bracket_map_2026.json) wins; otherwise
   // kickoff-order fallback within each round (FIFA numbers matches chronologically).
@@ -749,6 +777,7 @@ function stoppageStrip(m, startedM, fin){
       if(p.pot_points!=null)
         mark = p.pot_points>0 ? ' <span class="hitm">✓ +'+p.pot_points+'</span>' : ' <span class="missm">✗</span>';
       if(p.note) notes+='<div class="note-line">'+esc(pl.name)+': “'+esc(p.note)+'”</div>';
+      else if(p.has_note) notes+='<div class="note-line sealed">◆ '+esc(pl.name)+' — pundit note sealed until scored</div>';
       return esc(stoppageLabel(p, IDX.teamById))+(p.token?" ◆":"")+mark;
     });
     h+='<span class="person in w'+i+'"><span class="dot"></span>'+esc(pl.name)+' · '+parts.join(" · ")+'</span>';
@@ -781,6 +810,7 @@ function bonusStrip(m){
              : (p.points>0 ? ' <span class="hitm">✓ +'+(p.points+(p.rival_bonus||0))+'</span>' : ' <span class="missm">✗</span>');
       }
       if(p.note) notes+='<div class="note-line">'+esc(pl.name)+': “'+esc(p.note)+'”</div>';
+      else if(p.has_note) notes+='<div class="note-line sealed">◆ '+esc(pl.name)+' — pundit note sealed until resolved</div>';
       return esc(bonusLabel(p))+(p.token?" ◆":"")+mark;
     });
     h+='<span class="person in w'+i+'"><span class="dot"></span>'+esc(pl.name)+' · '+parts.join(" · ")+'</span>';
@@ -840,6 +870,24 @@ function boardTab(){
     catBox+='<div>'+r[0]+'</div><div class="num c1">'+(c1[r[1]]||0)+'</div><div class="num c2">'+(c2[r[1]]||0)+'</div>';
   });
   catBox+='<div class="tot">Total</div><div class="num c1 tot">'+(c1.total||0)+'</div><div class="num c2 tot">'+(c2.total||0)+'</div></div>';
+  // Books closed (every fixture played, nothing live or upcoming): the board becomes
+  // the historical record — all scorecards, Final first, newest stage down to Matchday 1.
+  var done=fin.length>0 && !live.length && !up.length;
+  if(done){
+    var secs=roundSections(fin);
+    var finalSec=(secs.length && secs[0].label==="The Final") ? secs.shift() : null;
+    var finalBox='<h2>The Final</h2>'+(finalSec
+      ? '<div class="cardgrid">'+finalSec.matches.map(matchCard).join("")+'</div>' : "");
+    h+='<div class="toprow"><div>'+catBox+'</div><div>'+finalBox+'</div></div>';
+    h+='<h2>The full record</h2><div class="sub">All '+fin.length+' scorecards, preserved as played — '+
+       'every pick, token, pundit note, bonus bet and the stoppage pot. Newest stage first.</div>';
+    secs.forEach(function(s){
+      h+='<div class="grp-label">'+esc(s.label)+'</div><div class="cardgrid">'+
+         s.matches.map(matchCard).join("")+'</div>';
+    });
+    return h;
+  }
+
   var finBox='<h2>Latest results</h2>'+(fin.length
     ? '<div class="cardgrid">'+fin.slice(-4).reverse().map(matchCard).join("")+'</div>'
     : '<div class="placeholder">Results land here after the first final whistle.</div>');

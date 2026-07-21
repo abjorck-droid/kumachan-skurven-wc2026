@@ -937,7 +937,12 @@ async function publicView(env) {
       resolved: !!f.resolved,
       has_note: !!f.pundit_note,                               // existence only — content stays sealed
     };
-    if (f.resolved && f.pundit_note) p.note = f.pundit_note;   // notes stay sealed until resolution
+    // Notes stay sealed until resolution. Pot rows: a scored pot_points counts as
+    // resolved — the engine's blanket pass used to flip their `resolved` checkbox
+    // back off (fixed 2026-07-21), which silently re-sealed 17 notes on the last
+    // two fixtures; this keeps the archive readable regardless of that flag.
+    const unsealed = f.resolved || (f.pot === "stoppage" && f.pot_points != null);
+    if (unsealed && f.pundit_note) p.note = f.pundit_note;
     picks[owner].push(p);
   }
 
